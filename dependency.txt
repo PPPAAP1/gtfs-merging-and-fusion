@@ -1,0 +1,10 @@
+definitely: 
+pandas
+protobuf
+gtfs-realtime-bindings
+requests
+lxml
+
+maybe:
+loguru    # 优雅的日志
+tqdm      # 进度条
