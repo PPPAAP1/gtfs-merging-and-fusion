@@ -21,12 +21,12 @@ from datetime import datetime
 # -------------------------
 # 配置
 # -------------------------
-P12_FILE = r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\certificate.p12"
+P12_FILE = r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion\certificate.p12"
 P12_PASSWORD = b"T34hM61D@WAh"
 PULL_URL = "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
 
 # 输出目录
-OUTPUT_DIR = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\data_realtime")
+OUTPUT_DIR = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion\data_realtime")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -------------------------

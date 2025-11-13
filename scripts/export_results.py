@@ -12,10 +12,15 @@ from lxml import etree
 import json
 
 # ---------- CSV ----------
-def save_csv(df: pd.DataFrame, output_dir: Path, filename: str):
+def save_csv(df: pd.DataFrame, output_dir: Path, filename: str, route_type: str = None):
     """
-    保存 DataFrame 为 CSV，自动创建目录 + 时间戳防覆盖
+    保存 DataFrame 为 CSV，自动创建目录 + 时间戳防覆盖。
+    如果提供了 route_type，则在对应的子文件夹中保存。
     """
+    # 如果指定了 route_type，就新建一个子目录
+    if route_type:
+        output_dir = output_dir / f"route_type_{route_type}"
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 添加时间戳
@@ -28,7 +33,7 @@ def save_csv(df: pd.DataFrame, output_dir: Path, filename: str):
     file_path = output_dir / filename_with_time
     df.to_csv(file_path, index=False, encoding='utf-8-sig')
 
-    print(f"✅ Saved CSV: {file_path.name}")
+    print(f"✅ Saved CSV: {file_path}")
     return file_path
 
 # ---------- XML ----------

@@ -9,130 +9,120 @@ import pandas as pd
 from pathlib import Path
 
 def load_static_gtfs(static_dir: Path) -> pd.DataFrame:
-    """
-    读取 GTFS 静态数据目录下的必要文件，并返回整理后的 DataFrame。
-
-    参数:
-        static_dir (Path): 包含 GTFS 静态数据文件的目录路径
-
-    返回:
-        pandas.DataFrame: 整合后的静态 GTFS 数据表
-    """
     print(f"🔹 Loading static GTFS data from: {static_dir}")
 
     # -------------------------
-    # 1. 读取必要文件
+    # 1. 文件路径与存在性检查
     # -------------------------
     trips_path = static_dir / "trips.txt"
     stop_times_path = static_dir / "stop_times.txt"
     stops_path = static_dir / "stops.txt"
     routes_path = static_dir / "routes.txt"
 
-    # 文件存在性检查
     for file in [trips_path, stop_times_path, stops_path, routes_path]:
         if not file.exists():
             raise FileNotFoundError(f"❌ Missing required GTFS file: {file}")
 
-    trips = pd.read_csv(trips_path, low_memory=False, dtype=str)
-    #### stop_times = pd.read_csv(stop_times_path, low_memory=False, dtype=str) # 必须分块读取。
-    stops = pd.read_csv(stops_path, low_memory=False, dtype=str)
-    routes = pd.read_csv(routes_path, low_memory=False, dtype=str)
-
-    print("✅ Loaded trips.txt, stops.txt, routes.txt")
-
-    # ===============================
-    #   分块读取 stop_times.txt
-    # ===============================
-    print("📦 Reading stop_times.txt in chunks...")
-    chunk_list = []
-    for chunk in pd.read_csv(stop_times_path, dtype=str, chunksize=chunksize):
-        chunk_list.append(chunk)
-        print(f"  ⏩ Loaded {len(chunk)} rows (Total: {sum(len(c) for c in chunk_list)})")
-
-    stop_times = pd.concat(chunk_list, ignore_index=True)
-    print(f"✅ stop_times loaded with {len(stop_times)} rows.")
+    # -------------------------
+    # 2. 读取主要文件
+    # -------------------------
+    routes = pd.read_csv(routes_path, dtype=str, low_memory=False)
+    trips = pd.read_csv(trips_path, dtype=str, low_memory=False)
+    stops = pd.read_csv(stops_path, dtype=str, low_memory=False)
+    print(f"✅ Loaded routes({len(routes)}), trips({len(trips)}), stops({len(stops)})")
 
     # -------------------------
-    # 2. route_type 筛选
+    # 3. route_type 诊断输出
     # -------------------------
-    print("\n可选的交通类型（route_type）:") 
-    
-    # print(routes["route_type"].value_counts()) 我觉得可以加注释：
+    if "route_type" not in routes.columns:
+        raise ValueError("❌ routes.txt 缺少 route_type 列")
 
-    # route_type 对照表（Needs to be Cross Validated!!）
     route_type_labels = {
-        0: "Tram / Streetcar / Light rail",
-        1: "Subway / Metro",
-        2: "Rail / Train",
-        3: "Bus",
-        4: "Ferry",
-        5: "Cable tram",
-        6: "Aerial lift / Gondola",
-        7: "Funicular",
         100: "Railway Service",
-        101: "High-speed Rail",
-        102: "Long-distance Rail",
-        106: "Regional Rail",
-        109: "Suburban Rail",
-        200: "Bus Service",
-        300: "Coach Service",
-        400: "Urban Railway",
-        700: "Regional Train (🇩🇪 DB Regio)",
-        704: "Tram / Stadtbahn (🇩🇪)",
-        715: "S-Bahn (🇩🇪)",
-        900: "Water Transport",
-        1000: "Air Service",
-        1501: "Cableway / Seilbahn",
-        201: "Express Bus",
+        101: "High Speed Rail Service (ICE)",
+        102: "Long Distance (IC/EC)",
+        103: "Inter Regional Rail",
+        105: "Sleeper Rail Service",
+        106: "Regional Rail (RB/RE)",
+        108: "Rail Shuttle",
+        109: "Suburban (S-Bahn)",
     }
 
-    # 显示带注释的 route_type 统计
+    print("\n📊 当前数据中的 route_type 统计：")
+    routes["route_type"] = routes["route_type"].str.strip()
     counts = routes["route_type"].value_counts().sort_index()
-    for route_type, count in counts.items():
-        label = route_type_labels.get(route_type, "Unknown Type")
-        print(f"{route_type:<6} {count:>8}  ({label})")
+    for rt, cnt in counts.items():
+        label = route_type_labels.get(int(rt)) if rt.isdigit() else "---UNKNOWN---"
+        print(f"  {rt:<5} {cnt:>6} ({label})")
 
+    # -------------------------
+    # 4. 用户输入筛选条件
+    # -------------------------
+    route_type_filter = input("\n请输入要保留的 route_type 数字或范围, 用逗号分隔: ").strip()
 
-    route_type_filter = input(
-        "\n请输入要保留的 route_type 数字或范围: "
-    ).strip()
-
-    if route_type_filter == "":
-        # 默认保留德国铁路（7开头）
-        route_ids = routes[routes['route_type'].astype(str).str.startswith("7")]['route_id']
+    if not route_type_filter:
+        route_type_list = ["106"]  # 默认德国区域铁路
     else:
-        # 用户输入逗号分隔多个类型
-        route_type_list = [int(x.strip()) for x in route_type_filter.split(",")]
-        route_ids = routes[routes['route_type'].isin(route_type_list)]['route_id']
+        route_type_list = [x.strip() for x in route_type_filter.split(",")]
 
-    # 筛选 trips
-    if 'route_id' not in trips.columns:
-        raise ValueError("trips.txt 文件缺少 route_id 列，无法进行 route_type 筛选")
-    trips = trips[trips['route_id'].isin(route_ids)]
+    route_ids = routes[routes["route_type"].isin(route_type_list)]["route_id"].unique().tolist()
+    print(f"🔹 Found {len(route_ids)} route_ids for selected route_type(s): {route_type_list}")
 
-    # -------------------------
-    # 3. 保留必要列
-    # -------------------------
-    trips = trips[['trip_id', 'service_id']] if 'service_id' in trips.columns else trips[['trip_id']]
-    stop_times = stop_times[['trip_id', 'stop_id', 'arrival_time', 'departure_time']]
-    stops = stops[['stop_id', 'stop_name']]
+    if len(route_ids) == 0:
+        print("⚠️ 没有匹配的 route_id，请检查 route_type 是否正确。")
+        return pd.DataFrame()
 
     # -------------------------
-    # 4. 合并 stop_times + trips + stops
+    # 5. 获取对应 trip_id
     # -------------------------
+    if "route_id" not in trips.columns:
+        raise ValueError("❌ trips.txt 缺少 route_id 列。")
+
+    trips_filtered = trips[trips["route_id"].isin(route_ids)].copy()
+    trip_ids = trips_filtered["trip_id"].unique().tolist()
+    print(f"🔹 Found {len(trip_ids)} trip(s) under selected route_type(s)")
+
+    if len(trip_ids) == 0:
+        print("⚠️ 没有找到对应 trip，可能 route_id 没有匹配成功。")
+        return pd.DataFrame()
+
+    # -------------------------
+    # 6. 分块读取 stop_times 并过滤
+    # -------------------------
+    print("📦 Reading stop_times.txt in chunks (filtering on the fly)...")
+    filtered_chunks = []
+    total_rows = 0
+    kept_rows = 0
+
+    for chunk in pd.read_csv(stop_times_path, dtype=str, chunksize=500000):
+        total_rows += len(chunk)
+        chunk_filtered = chunk[chunk["trip_id"].isin(trip_ids)]
+        kept_rows += len(chunk_filtered)
+        filtered_chunks.append(chunk_filtered)
+        print(f"  ⏩ Read {total_rows:,} rows, kept {kept_rows:,} so far")
+
+    if kept_rows == 0:
+        print("⚠️ 没有匹配的 stop_times 行。")
+        return pd.DataFrame()
+
+    stop_times = pd.concat(filtered_chunks, ignore_index=True)
+    print(f"✅ stop_times loaded with {len(stop_times):,} filtered rows.")
+
+    # -------------------------
+    # 7. 合并 + 精简列
+    # -------------------------
+    stops = stops[["stop_id", "stop_name", "stop_lat", "stop_lon"]].copy()
     merged_df = (
         stop_times
-        .merge(trips, on='trip_id', how='inner')
-        .merge(stops, on='stop_id', how='left')
+        .merge(trips_filtered[["trip_id", "service_id"]], on="trip_id", how="left")
+        .merge(stops, on="stop_id", how="left")
     )
 
-    # -------------------------
-    # 5. 排序 & 去重
-    # -------------------------
-    merged_df = merged_df[['trip_id', 'stop_id', 'stop_name', 'arrival_time', 'departure_time', 'service_id']]
-    merged_df = merged_df.sort_values(by=['trip_id', 'stop_id']).drop_duplicates().reset_index(drop=True)
+    merged_df = merged_df[
+        ["trip_id", "stop_id", "stop_name", "stop_lat", "stop_lon", "arrival_time", "departure_time", "service_id"]
+    ].drop_duplicates().reset_index(drop=True)
 
-    print(f"✅ Loaded {len(merged_df)} rows of static GTFS data.")
+    print(f"✅ Loaded {len(merged_df):,} rows of static GTFS data.")
     return merged_df
 
 
@@ -140,7 +130,7 @@ def load_static_gtfs(static_dir: Path) -> pd.DataFrame:
 # 独立测试
 # -------------------------
 if __name__ == "__main__":
-    base_dir = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf")
+    base_dir = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion")
     static_dir = base_dir / "data_static"
     df = load_static_gtfs(static_dir)
     print(df.head())

@@ -9,7 +9,7 @@ from export_results import save_csv
 # -------------------------
 # 配置路径
 # -------------------------
-BASE_DIR = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf")
+BASE_DIR = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion")
 STATIC_DIR = BASE_DIR / "data_static"
 REALTIME_DIR = BASE_DIR / "data_realtime"
 OUTPUT_DIR = BASE_DIR / "output"

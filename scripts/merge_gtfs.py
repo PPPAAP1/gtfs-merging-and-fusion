@@ -14,7 +14,7 @@ def merge_data(static_df: pd.DataFrame, rt_df: pd.DataFrame, chunk_size: int = 1
         pd.DataFrame: 合并后的结果
     """
      # 保留静态列
-    static_df = static_df[['trip_id','stop_id','stop_name','arrival_time','departure_time','service_id']]
+    static_df = static_df[['trip_id','stop_id','stop_name','stop_lat','stop_lon','arrival_time','departure_time','service_id']]
     
     # 保留实时列，但只取存在的列
     needed_cols = ['trip_id','stop_id','arrival_delay','departure_delay','status_arrival','status_departure','fetch_timestamp']
@@ -39,7 +39,16 @@ def merge_data(static_df: pd.DataFrame, rt_df: pd.DataFrame, chunk_size: int = 1
     merged_df = pd.concat(merged_chunks, ignore_index=True)
 
     # 标记延迟
-    merged_df['arrival_delay_flag'] = merged_df['arrival_delay'].apply(lambda x: 1 if pd.notnull(x) and x > 0 else 0)
-    merged_df['departure_delay_flag'] = merged_df['departure_delay'].apply(lambda x: 1 if pd.notnull(x) and x > 0 else 0)
+    # merged_df['arrival_delay_flag'] = merged_df['arrival_delay'].apply(lambda x: 1 if pd.notnull(x) and x > 0 else 0)
+    # merged_df['departure_delay_flag'] = merged_df['departure_delay'].apply(lambda x: 1 if pd.notnull(x) and x > 0 else 0)
+
+    # ---------- 延迟（秒）数值化 ----------
+    merged_df['arrival_delay_seconds'] = merged_df['arrival_delay'].apply(
+    lambda x: x if pd.notnull(x) and x > 0 else 0
+    )
+
+    merged_df['departure_delay_seconds'] = merged_df['departure_delay'].apply(
+    lambda x: x if pd.notnull(x) and x > 0 else 0
+    )
 
     return merged_df
