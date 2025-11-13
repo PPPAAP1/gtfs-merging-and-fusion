@@ -1,0 +1,30 @@
+# no output folders
+data_realtime/
+output/
+maps/
+logs/
+
+# no static
+data_static/
+*.txt
+*.pb
+*.zip
+
+# no Python cache
+scripts/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.cache
+
+# no temp. file
+*.tmp
+*.log
+*.bak
+*.swp
+
+# no IDE / editor
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
