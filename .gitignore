@@ -1,14 +1,15 @@
 # no output folders
-data_realtime/
-output/
-maps/
-logs/
+log/
+
+*csv
+*json
+*pb
 
 # no static
-data_static/
-*.txt
-*.pb
-*.zip
+routes.txt
+stop_times.txt
+stops.txt
+trips.txt
 
 # no Python cache
 scripts/__pycache__/
