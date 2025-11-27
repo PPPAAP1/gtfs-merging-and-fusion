@@ -1,0 +1,82 @@
+# ================================
+#   Global Configuration File
+#   For GTFS + GTFS-RT Analysis
+# ================================
+
+project:
+  name: "gtfs-merging-and-fusion"
+  version: "0.1.0"
+
+paths:
+  raw_static: "data/raw/static/"
+  raw_rt: "data/raw/rt/"
+
+# 默认选取的 route_type，可为列表
+default_route_type:
+  - "106"
+
+
+realtime:
+  p12_file: "H:/The Coding Environment/Railway Operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/certificate.p12"
+  p12_password: "T34hM61D@WAh"
+  pull_url: "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
+  output_rt_dir: "data/raw/rt/FETCHED/"
+  FETCH_INTERVAL_MINUTES: 12
+
+  # TERMINATE MANUALLY USING CTRL + C!!!!!!!!!!!!!
+  # Pause using Ctrl + S
+  # please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/
+
+
+  # 清洗后的输出
+  cleaned_rt: "data/processed/"
+
+#条件输出结果：
+processed_dir: "data/processed/"
+
+
+# 输出结果
+output_dir: "output/"
+plot_trend: "output/plots/"
+  # filtered_data: "data/processed/"
+
+#time:
+  # 使用自然日
+  #start: "2025-01-01 00:00:00"
+  #end: "2025-01-01 23:59:59"
+
+  # 聚合窗口
+  #aggregation_minutes: 10
+
+filters:
+
+  stop_ids_dresden:
+    # TODO: 把你的 Dresden stop_id 列表填进去
+    - 8002549
+    - 8010085
+    - 324234 
+    # ... continue
+
+  valid_route_types:
+    - 101   # ICE
+    - 102   # IC/EC
+    - 103   # Inter Regional
+    - 106   # RB/RE
+    - 109   # S-Bahn
+    - 700   # Bus
+    - 704   # Tram
+
+  # 你分析的交通方式类别映射
+  category_mapping:
+    bus: [700]
+    tram: [704]
+    s_bahn: [109]
+    ice_ic: [101, 102]
+
+cleaning:
+  # 过滤异常延迟的数据
+  min_arrival_delay: -300     # 删除 -300 秒以下 —— 数据噪声
+  max_arrival_delay: 7200     # 删除 2 小时以上 —— 极值
+
+settings:
+  log_level: "INFO"

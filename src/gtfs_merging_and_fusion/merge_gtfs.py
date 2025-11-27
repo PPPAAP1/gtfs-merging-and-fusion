@@ -13,7 +13,7 @@ def merge_data(static_df: pd.DataFrame, rt_df: pd.DataFrame, chunk_size: int = 1
     返回:
         pd.DataFrame: 合并后的结果
     """
-     # 保留静态列
+    # 保留静态列
     static_df = static_df[['trip_id','stop_id','stop_name','stop_lat','stop_lon','arrival_time','departure_time','service_id']]
     
     # 保留实时列，但只取存在的列

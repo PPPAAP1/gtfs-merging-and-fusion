@@ -4,6 +4,8 @@ log/
 *csv
 *json
 *pb
+*zip
+*png
 
 # no static
 routes.txt
@@ -29,3 +31,6 @@ scripts/__pycache__/
 .idea/
 *.sublime-workspace
 *.sublime-project
+
+# no Research Documents
+Research_Documents/

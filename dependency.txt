@@ -3,8 +3,5 @@ pandas
 protobuf
 gtfs-realtime-bindings
 requests
-lxml
+pyaml
 
-maybe:
-loguru    # 优雅的日志
-tqdm      # 进度条

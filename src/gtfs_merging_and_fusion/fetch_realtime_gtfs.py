@@ -1,23 +1,10 @@
-"""
-fetch_realtime_gtfs.py
-----------------------
-每 12 分钟抓取一次 GTFS-RT TripUpdates feed，保存 .pb/.json/.csv。
-自动记录时间轴，统计延迟记录总数。
-每天结束时生成延迟趋势图。
-
-输出：
-- data_realtime/tripupdates_*.pb
-- data_realtime/DELFI_GTFS_TripUpdates_*.csv
-- data_realtime/timeline.csv
-- data_realtime/delay_trend.png
-"""
-
 import os
 import time
 import json
 import tempfile
 import requests
 import pandas as pd
+import yaml
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives import serialization
@@ -26,35 +13,52 @@ from cryptography.hazmat.backends import default_backend
 from google.transit import gtfs_realtime_pb2
 import matplotlib.pyplot as plt
 
-# -------------------------
-# 配置
-# -------------------------
-P12_FILE = r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion\certificate.p12"
-P12_PASSWORD = b"T34hM61D@WAh"
-PULL_URL = "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
 
-OUTPUT_DIR = Path(r"H:\The Coding Environment\Railway Operation\gtfs-data-mandf\gtfs-merging-and-fusion\data_realtime")
+# -------------------------
+# Load Configuration
+# -------------------------
+CONFIG_PATH = "config/config.yaml"
+
+try:
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+except FileNotFoundError:
+    raise FileNotFoundError(f"❌ Check config file, config/config.yaml: {CONFIG_PATH}")
+except yaml.YAMLError as e:
+    raise Exception(f"❌ YAML error, check config/config.yaml: {e}")
+
+if "realtime" not in cfg:
+    raise KeyError("❌Check 'realtime', config/config.yaml")
+
+rt_cfg = cfg["realtime"]
+
+P12_FILE = rt_cfg.get("p12_file")
+P12_PASSWORD = rt_cfg.get("p12_password", "").encode("utf-8")
+PULL_URL = rt_cfg.get("pull_url")
+OUTPUT_DIR = Path(rt_cfg.get("output_rt_dir", "data_realtime"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+FETCH_INTERVAL_MINUTES = rt_cfg.get("fetch_interval_minutes", 12)
+FETCH_INTERVAL_SECONDS = FETCH_INTERVAL_MINUTES * 60
+PRINT_INTERVAL = 1  # Print countdown every second
 
 TIMELINE_FILE = OUTPUT_DIR / "timeline.csv"
-
-# 初始化时间轴
 timeline_log = []
 
-# -------------------------
-# 抓取函数
-# -------------------------
+# --------------------------------------
+# Fetching GTFS-RT
+# --------------------------------------
 def fetch_gtfs_rt_once():
-    """执行一次 GTFS-RT 抓取并保存"""
     print("=" * 60)
     print(f"🚀 Fetching GTFS-RT feed at {datetime.now().isoformat(timespec='seconds')}")
 
-    # 1️⃣ 读取证书
+    # Certificate and key extraction(GPT)
     with open(P12_FILE, "rb") as f:
         p12_data = f.read()
+
     private_key, certificate, _ = pkcs12.load_key_and_certificates(
         p12_data, P12_PASSWORD, backend=default_backend()
     )
+
     cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
     key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -62,27 +66,30 @@ def fetch_gtfs_rt_once():
         encryption_algorithm=serialization.NoEncryption()
     )
 
-    # 2️⃣ 写 PEM 临时文件
+    # Write PEM temporary files
     with tempfile.NamedTemporaryFile(delete=False) as cert_file:
         cert_file.write(cert_pem)
         cert_path = cert_file.name
+
     with tempfile.NamedTemporaryFile(delete=False) as key_file:
         key_file.write(key_pem)
         key_path = key_file.name
 
     try:
-        # 3️⃣ 下载 GTFS-RT 数据
+        # Download GTFS-RT feed (GPT)
         response = requests.get(PULL_URL, cert=(cert_path, key_path), timeout=30)
         if response.status_code != 200:
-            print(f"❌ 下载失败: HTTP {response.status_code}")
+            print(f"❌ Download Failed: HTTP {response.status_code}")
             return None
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Save raw .pb file
         pb_file_path = OUTPUT_DIR / f"tripupdates_{timestamp}.pb"
         pb_file_path.write_bytes(response.content)
         print(f"✅ Saved raw GTFS-RT feed to {pb_file_path.name}")
 
-        # 4️⃣ 解析 protobuf
+        # Parse protobuf
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(response.content)
 
@@ -94,7 +101,9 @@ def fetch_gtfs_rt_once():
         for entity in feed.entity:
             if not entity.HasField('trip_update'):
                 continue
+
             trip_id = entity.trip_update.trip.trip_id
+
             for stu in entity.trip_update.stop_time_update:
                 stop_id = stu.stop_id
                 arrival_delay = stu.arrival.delay if stu.HasField("arrival") and stu.arrival.HasField("delay") else None
@@ -113,20 +122,22 @@ def fetch_gtfs_rt_once():
                     "fetch_timestamp": fetch_time
                 })
 
-        # 5️⃣ 保存 JSON + CSV
+        # JSON
         json_file_path = OUTPUT_DIR / f"DELFI_GTFS_TripUpdates_{timestamp}.json"
         with open(json_file_path, "w", encoding="utf-8") as f:
             json.dump(records, f, ensure_ascii=False, indent=2)
 
-        df = pd.DataFrame(records)
+        # Save CSV
         csv_file_path = OUTPUT_DIR / f"DELFI_GTFS_TripUpdates_{timestamp}.csv"
-        df.to_csv(csv_file_path, index=False, encoding="utf-8-sig")
+        df = pd.DataFrame(records)
+        df.to_csv(csv_file_path, index=False, encoding="utf-8-sig")  # 避免 Excel 乱码
+
 
         total_delays = arrival_delays + departure_delays
-        print(f"📊 延迟记录统计: 到达延迟 {arrival_delays}, 出发延迟 {departure_delays}, 总计 {total_delays}")
+        print(f"📊 Delay minutes trend: Arrival {arrival_delays} minutes, Departure {departure_delays} minutes, Total {total_delays} minutes")
         print(f"✅ Saved JSON/CSV ({len(records)} records)")
 
-        # 6️⃣ 记录时间轴
+        # Write to timeline.csv
         timeline_log.append({
             "timestamp": fetch_time,
             "records_total": len(records),
@@ -134,54 +145,61 @@ def fetch_gtfs_rt_once():
             "departure_delays": departure_delays,
             "total_delay_records": total_delays
         })
-
-        # 7️⃣ 追加保存 timeline.csv
         pd.DataFrame(timeline_log).to_csv(TIMELINE_FILE, index=False, encoding="utf-8-sig")
 
     except Exception as e:
         print(f"⚠️ Error during fetch: {e}")
+
     finally:
         os.remove(cert_path)
         os.remove(key_path)
 
-# -------------------------
-# 绘制趋势图
-# -------------------------
+
+# --------------------------------------
+# Trend Plot
+# --------------------------------------
 def plot_delay_trend():
-    """绘制延迟记录趋势图"""
     if not TIMELINE_FILE.exists():
-        print("❌ 没有 timeline.csv，无法绘图。")
+        print("❌ timeline.csv does not exist")
         return
 
     df = pd.read_csv(TIMELINE_FILE)
     if df.empty:
-        print("❌ timeline.csv 是空的。")
+        print("❌ timeline.csv is empty")
         return
 
     df['timestamp'] = pd.to_datetime(df['timestamp'])
+
     plt.figure(figsize=(12, 6))
-    plt.plot(df['timestamp'], df['total_delay_records'], marker='o', linestyle='-')
-    plt.title("GTFS-RT 延迟记录趋势（每12分钟）")
-    plt.xlabel("时间")
-    plt.ylabel("延迟记录总数")
+    plt.plot(df['timestamp'], df['total_delay_records'], marker='o')
+    plt.title("GTFS-RT Delay Frequency Trend")
+    plt.xlabel("Time")
+    plt.ylabel("Number of Delay Records")
     plt.grid(True)
     plt.tight_layout()
 
     plot_path = OUTPUT_DIR / "delay_trend.png"
     plt.savefig(plot_path, dpi=150)
-    print(f"📈 延迟趋势图已保存到 {plot_path.name}")
+    print(f"📈 Saved trend plot: {plot_path.name}")
 
-# -------------------------
-# 主循环
-# -------------------------
+# --------------------------------------
+# Main Program
+# --------------------------------------
 if __name__ == "__main__":
-    print("🚆 启动 GTFS-RT 抓取任务（每 12 分钟一次，按 Ctrl+C 终止）")
+    print(f"🚆 GTFS-RT Fetch Task Started (Every {FETCH_INTERVAL_MINUTES} Minutes)")
     try:
         while True:
             fetch_gtfs_rt_once()
-            print("⏳ 等待 12 分钟...")
-            time.sleep(12 * 60)
+
+            remaining = FETCH_INTERVAL_SECONDS
+            while remaining > 0:
+                print(f"⏳ Next fetch countdown: {remaining} seconds", end="\r", flush=True)
+                sleep_time = min(PRINT_INTERVAL, remaining)
+                time.sleep(sleep_time)
+                remaining -= sleep_time
+            print()
+
     except KeyboardInterrupt:
-        print("\n🛑 手动中断抓取任务，正在绘制趋势图...")
+        print("\n🛑 Manual stop, generating trend plot...")
         plot_delay_trend()
-        print("✅ Alles fertig!")
+        print("✅ Done!")
