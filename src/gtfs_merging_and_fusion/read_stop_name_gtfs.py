@@ -1,52 +1,34 @@
 import pandas as pd
 from pathlib import Path
 import yaml
+import matplotlib.pyplot as plt
 
 def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
     static_dir = Path(cfg["paths"]["raw_static"])
-    output_dir = Path(cfg["output_dir"])
+    output_dir = Path(cfg["processed_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"🔹 Loading static GTFS data from: {static_dir}")
 
-    # -------------------------
-    trips_path = static_dir / "trips.txt"
+    trips = pd.read_csv(static_dir / "trips.txt", dtype=str, low_memory=False)
+    stops = pd.read_csv(static_dir / "stops.txt", dtype=str, low_memory=False)
     stop_times_path = static_dir / "stop_times.txt"
-    stops_path = static_dir / "stops.txt"
-    routes_path = static_dir / "routes.txt"
 
-    for file in [trips_path, stop_times_path, stops_path, routes_path]:
-        if not file.exists():
-            raise FileNotFoundError(f"❌ Missing required GTFS file: {file}")
+    matched_stops = stops[stops["stop_name"].str.contains(stop_name, case=False, na=False)]
+    if matched_stops.empty:
+        print(f"⚠️ No stops matched for '{stop_name}'")
+        return pd.DataFrame(), []
+
+    stop_ids = matched_stops["stop_id"].unique().tolist()
+    print(f"🔹 Found {len(stop_ids)} stop_id(s) for '{stop_name}':")
+    for sid, sname in zip(matched_stops["stop_id"], matched_stops["stop_name"]):
+        print(f"   {sid} → {sname}")
 
     # -------------------------
-    # reading route trips stops
-    # -------------------------
-    routes = pd.read_csv(routes_path, dtype=str, low_memory=False)
-    trips = pd.read_csv(trips_path, dtype=str, low_memory=False)
-    stops = pd.read_csv(stops_path, dtype=str, low_memory=False)
-    print(f"✅ Loaded routes({len(routes)}), trips({len(trips)}), stops({len(stops)})")
-
-    # ------------------------- 
-    # stop_times reading + filtering by stop_name
+    # stop_times reading + filtering by stop_ids in chunks
     # -------------------------
     print("📦 Reading stop_times.txt in chunks (filtering by stop_name)...")
     filtered_chunks = []
     total_rows = 0
     kept_rows = 0
-
-    # Get target stop_id list
-    matched_stops = stops[stops["stop_name"].str.contains(stop_name, case=False, na=False)]
-    if matched_stops.empty:
-        print(f"⚠️ No stops matched for '{stop_name}'")
-        return pd.DataFrame()
-
-    stop_ids = matched_stops["stop_id"].unique().tolist()
-    print(f"🔹 Found {len(stop_ids)} stop_id(s) for '{stop_name}':")
-
-    # Print all matched stop_name
-    for sid, sname in zip(matched_stops["stop_id"], matched_stops["stop_name"]):
-        print(f"   {sid} → {sname}")
-
 
     for chunk in pd.read_csv(stop_times_path, dtype=str, chunksize=500000):
         total_rows += len(chunk)
@@ -57,48 +39,118 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
 
     if kept_rows == 0:
         print("⚠️ No matching stop_times rows.")
-        return pd.DataFrame()
+        return pd.DataFrame(), []
 
     stop_times_filtered = pd.concat(filtered_chunks, ignore_index=True)
-    stops_filtered = matched_stops[["stop_id", "stop_name", "stop_lat", "stop_lon"]].copy()
 
-    merged_df = (
-        stop_times_filtered
-        .merge(trips[["trip_id", "service_id"]], on="trip_id", how="left")
-        .merge(stops_filtered, on="stop_id", how="left")
+    merged_df = stop_times_filtered.merge(trips[["trip_id","service_id"]], on="trip_id", how="left")
+    merged_df = merged_df.merge(matched_stops[["stop_id","stop_name","stop_lat","stop_lon"]], on="stop_id", how="left")
+    merged_df = merged_df[["trip_id","stop_id","stop_name","stop_lat","stop_lon","arrival_time","departure_time","service_id"]]
+
+    safe_name = stop_name.replace(" ","_")
+    output_file = output_dir / f"static_gtfs_{safe_name}.csv"
+    merged_df.to_csv(output_file, index=False, encoding="utf-8-sig")
+    print(f"✅ Saved static GTFS to {output_file}")
+
+    return merged_df, stop_ids
+
+
+def load_realtime_data(cfg: dict, stop_ids: list) -> pd.DataFrame:
+    rt_dir = Path(cfg["paths"]["raw_rt"])
+    all_files = sorted(list(rt_dir.glob("*")))  # CSV 或 JSON 文件
+    total_files = len(all_files)
+    all_records = []
+
+    if total_files == 0:
+        print("⚠️ No real-time files found in directory")
+        return pd.DataFrame()
+    
+    for i, f in enumerate(all_files, 1):
+        if f.suffix.lower() == ".csv":
+            df = pd.read_csv(f, dtype=str)
+        elif f.suffix.lower() == ".json":
+            df = pd.read_json(f, dtype=str)
+        else:
+            print(f"⚠️ Skipping unsupported file type: {f.name}")
+            continue
+
+        df_filtered = df[df["stop_id"].isin(stop_ids)].copy()
+        df_filtered["source_file"] = f.name
+        all_records.append(df_filtered)
+
+        print(f"📄 Processed {f.name} ({i}/{total_files}), kept {len(df_filtered)} rows, {total_files - i} files to go")
+
+    if not all_records:
+        return pd.DataFrame()
+
+    df_rt = pd.concat(all_records, ignore_index=True)
+    print(f"✅ All files processed. Total real-time rows for this stop: {len(df_rt)}")
+    return df_rt
+
+def analyze_delay(static_df, realtime_df, stop_name, cfg):
+
+    # Merge static + realtime
+    df = pd.merge(
+        realtime_df,
+        static_df,
+        on=["trip_id", "stop_id"],
+        how="left",
+        suffixes=("_rt", "_sched")
     )
 
-    merged_df = merged_df[
-        ["trip_id", "stop_id", "stop_name", "stop_lat", "stop_lon", "arrival_time", "departure_time", "service_id"]
-    ].drop_duplicates().reset_index(drop=True)
+    # Convert arrival_delay (string/float) to numeric
+    df["arrival_delay"] = pd.to_numeric(df["arrival_delay"], errors="coerce")
 
-    print(f"✅ Loaded {len(merged_df)} rows of static GTFS data.")
+    # Compute delay in minutes
+    df["delay_min"] = df["arrival_delay"] / 60.0
 
-    safe_stop_name = stop_name.replace(" ", "_")
-    output_file = output_dir / f"static_gtfs_{safe_stop_name}.csv"
-    merged_df.to_csv(output_file, index=False, encoding="utf-8-sig")
-    print(f"✅ Saved merged static GTFS to {output_file}")
+    # --- Compute departure delay ---
+    if "departure_delay" in df.columns:
+        df["departure_delay"] = pd.to_numeric(df["departure_delay"], errors="coerce")
+        df["dep_delay_min"] = df["departure_delay"] / 60.0
 
-    return merged_df
+    # Save CSV
+    output_dir = Path(cfg["output_dir"])
+    safe_name = stop_name.replace(" ", "_")
+    delay_file = output_dir / f"delay_{safe_name}.csv"
+    df.to_csv(delay_file, index=False, encoding="utf-8-sig")
+    print(f"✅ Saved delay CSV to {delay_file}")
 
-# ------------------------- Standalone Run -------------------------
+
+    
+    # Plot trend: arrival_time_sched (static) vs delay_min
+    # Convert scheduled arrival_time to datetime for plotting
+    df["fetch_timestamp"] = pd.to_datetime(df["fetch_timestamp"], errors="coerce")
+
+    plt.figure(figsize=(12, 6))
+    plt.scatter(df["fetch_timestamp"], df["arrival_delay"], alpha=0.5)
+    plt.xlabel("Fetch Timestamp")
+    plt.ylabel("Delay (Seconds)")
+    plt.title(f"Delay Trend - {stop_name}")
+    plt.grid(True)
+    plt.tight_layout()
+
+    plot_file = output_dir / f"delay_trend_{safe_name}.png"
+    plt.savefig(plot_file)
+    print(f"✅ Saved delay trend plot to {plot_file}")
+    plt.close()
+
+
 if __name__ == "__main__":
-    # Load configuration file
     with open("config/config.yaml", "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
-    # User input stop_name:
-    stop_name = input("Please enter stop name (e.g., Dresden Hbf): ").strip()
+    stop_name = input("Please enter stop name (e.g., Dresden Hauptbahnhof): ").strip()
     if not stop_name:
-        print("❌ No stop name entered, exiting")
         exit(0)
 
-    df = load_static_gtfs_stop(cfg, stop_name)
+    static_df, stop_ids = load_static_gtfs_stop(cfg, stop_name)
+    if static_df.empty:
+        exit(0)
 
-    if not df.empty:
-        # Output .CSV
-        output_dir = Path(cfg["processed_dir"])
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"{stop_name.replace(' ', '_')}_static.csv"
-        df.to_csv(output_file, index=False, encoding="utf-8-sig")
-        print(f"📄 Saved filtered static GTFS to {output_file}")
+    realtime_df = load_realtime_data(cfg, stop_ids)
+    if realtime_df.empty:
+        print("⚠️ No real-time data for this stop")
+        exit(0)
+
+    analyze_delay(static_df, realtime_df, stop_name, cfg)

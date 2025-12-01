@@ -2,11 +2,6 @@ import pandas as pd
 from pathlib import Path
 import yaml
 
-
-##########################
-#Currently the result goes to output_dir/static_gtfs_*.csv
-##########################
-
 def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
     static_dir = Path(cfg["paths"]["raw_static"])
     output_dir = Path(cfg["processed_dir"])
@@ -95,6 +90,10 @@ def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
     merged_df.to_csv(output_file, index=False, encoding="utf-8-sig")
     print(f"✅ Saved merged static GTFS to {output_file}")
     return merged_df
+
+
+
+
 # ------------------------- Standalone Run -------------------------
 if __name__ == "__main__":
     # 1️⃣ Load configuration file

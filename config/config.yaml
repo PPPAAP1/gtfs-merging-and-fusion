@@ -9,7 +9,7 @@ project:
 
 paths:
   raw_static: "data/raw/static/"
-  raw_rt: "data/raw/rt/"
+  raw_rt: "data/raw/rt/2025-11-17/"
 
 # 默认选取的 route_type，可为列表
 default_route_type:
@@ -50,13 +50,6 @@ plot_trend: "output/plots/"
 
 filters:
 
-  stop_ids_dresden:
-    # TODO: 把你的 Dresden stop_id 列表填进去
-    - 8002549
-    - 8010085
-    - 324234 
-    # ... continue
-
   valid_route_types:
     - 101   # ICE
     - 102   # IC/EC
@@ -76,7 +69,7 @@ filters:
 cleaning:
   # 过滤异常延迟的数据
   min_arrival_delay: -300     # 删除 -300 秒以下 —— 数据噪声
-  max_arrival_delay: 7200     # 删除 2 小时以上 —— 极值
+  max_arrival_delay: 14400     # 删除 4 小时以上 —— 极值
 
 settings:
   log_level: "INFO"

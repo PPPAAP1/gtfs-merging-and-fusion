@@ -22,24 +22,31 @@ def main_menu():
         print("\n===============================")
         print("🚆 Welcome to GTFS Merging and Fusion Working Pannel ")
         print("===============================")
-        print("🚆 It is suggested to do the followings in order:")
+        print("It is suggested to do the followings if you already have full dataset:")
         print("1. Load and filter Static GTFS by Route Type")
-        print("2. (Optional) Fetch Real-time GTFS-RT Now")
-        print("3. Load and filter Static GTFS by Stop Name")
-        print("0. Exit")
+        print("or")
+        print("2. Load and filter Static GTFS by Stop Name")
         print("===============================")
+        print("If you don't have GTFS Real-time data:")
+        print("3. Fetch Real-time GTFS-RT data now")
+        print("===============================")
+        print("0. Exit")
 
         choice = input("Please enter your choice number: ").strip()
         if choice == "1":
             print("\n📂 Running Static GTFS merging script")
             df = load_static_gtfs_route(cfg)
             print(df.head())
+        
         elif choice == "2":
-            print("\n🕒 Preparing for Fetching Real-time GTFS-RT")
-            fetch_gtfs_rt_once()
-        elif choice == "3":
             print("\n📂 Running Static GTFS merging script by Stop Name")
             df = load_static_gtfs_stop(cfg)
+            print(df.head())
+
+        elif choice == "3":
+            print("\n🕒 Preparing for Fetching Real-time GTFS-RT")
+            fetch_gtfs_rt_once()
+
             print(df.head())
         elif choice == "0":
             print("👋 Seeya")
