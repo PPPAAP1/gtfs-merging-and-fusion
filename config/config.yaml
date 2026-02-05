@@ -9,7 +9,7 @@ project:
 
 paths:
   raw_static: "data/raw/static/"
-  raw_rt: "data/raw/rt/2025-11-17/"
+  raw_rt: "data/raw/rt/2025-12-04/"
 
 # 默认选取的 route_type，可为列表
 default_route_type:

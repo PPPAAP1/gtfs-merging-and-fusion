@@ -9,7 +9,11 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     trips = pd.read_csv(static_dir / "trips.txt", dtype=str, low_memory=False)
+    routes = pd.read_csv(static_dir / "routes.txt", dtype=str, low_memory=False)
     stops = pd.read_csv(static_dir / "stops.txt", dtype=str, low_memory=False)
+    # route_type + trips
+    trips = trips.merge(routes[["route_id","route_type"]], on="route_id", how="left")
+
     stop_times_path = static_dir / "stop_times.txt"
 
     matched_stops = stops[stops["stop_name"].str.contains(stop_name, case=False, na=False)]
@@ -43,9 +47,9 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
 
     stop_times_filtered = pd.concat(filtered_chunks, ignore_index=True)
 
-    merged_df = stop_times_filtered.merge(trips[["trip_id","service_id"]], on="trip_id", how="left")
+    merged_df = stop_times_filtered.merge(trips[["trip_id","service_id","route_type"]], on="trip_id", how="left")
     merged_df = merged_df.merge(matched_stops[["stop_id","stop_name","stop_lat","stop_lon"]], on="stop_id", how="left")
-    merged_df = merged_df[["trip_id","stop_id","stop_name","stop_lat","stop_lon","arrival_time","departure_time","service_id"]]
+    merged_df = merged_df[["trip_id","stop_id","route_type","stop_name","stop_lat","stop_lon","arrival_time","departure_time","service_id"]]
 
     safe_name = stop_name.replace(" ","_")
     output_file = output_dir / f"static_gtfs_{safe_name}.csv"
@@ -97,6 +101,12 @@ def analyze_delay(static_df, realtime_df, stop_name, cfg):
         how="left",
         suffixes=("_rt", "_sched")
     )
+    
+    print("Static columns:", static_df.columns)
+    print("Realtime columns:", realtime_df.columns)
+
+    print("Merged columns:", df.columns)
+    print(df.filter(regex="stop_name").head())
 
     # Convert arrival_delay (string/float) to numeric
     df["arrival_delay"] = pd.to_numeric(df["arrival_delay"], errors="coerce")
@@ -154,3 +164,5 @@ if __name__ == "__main__":
         exit(0)
 
     analyze_delay(static_df, realtime_df, stop_name, cfg)
+
+

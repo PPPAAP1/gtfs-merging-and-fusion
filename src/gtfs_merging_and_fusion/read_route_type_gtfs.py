@@ -93,8 +93,6 @@ def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
 
 
 
-
-# ------------------------- Standalone Run -------------------------
 if __name__ == "__main__":
     # 1️⃣ Load configuration file
     with open("config/config.yaml", "r", encoding="utf-8") as f:
