@@ -10,6 +10,7 @@ project:
 paths:
   raw_static: "data/raw/static/"
   raw_rt: "data/raw/rt/2025-12-04/"
+  # This path please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/...
 
 # 默认选取的 route_type，可为列表
 default_route_type:
@@ -17,7 +18,8 @@ default_route_type:
 
 
 realtime:
-  p12_file: "H:/The Coding Environment/Railway Operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/certificate.p12"
+  p12_file: "H:/the_coding_environment/railway_operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/certificate.p12"
+  # FIXME Don't confuse with \ and / when you directly copy the path and paste it here. Use / always.
   p12_password: "T34hM61D@WAh"
   pull_url: "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
   output_rt_dir: "data/raw/rt/FETCHED/"
@@ -25,7 +27,7 @@ realtime:
 
   # TERMINATE MANUALLY USING CTRL + C!!!!!!!!!!!!!
   # Pause using Ctrl + S
-  # please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/
+  # please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/...
 
 
   # 清洗后的输出

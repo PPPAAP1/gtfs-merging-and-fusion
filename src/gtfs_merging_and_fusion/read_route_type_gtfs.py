@@ -54,7 +54,7 @@ def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
     # -------------------------
     # stop_times reading + filtering
     # -------------------------
-    print("📦 Reading stop_times.txt in chunks...")
+    print("Reading stop_times.txt in chunks...")
     filtered_chunks = []
     total_rows = 0
     kept_rows = 0
@@ -64,7 +64,7 @@ def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
         chunk_filtered = chunk[chunk["trip_id"].isin(trip_ids)]
         kept_rows += len(chunk_filtered)
         filtered_chunks.append(chunk_filtered)
-        print(f"  ⏩ Read {total_rows:,} rows, kept {kept_rows:,} so far")
+        print(f"  📦 Read {total_rows:,} rows, kept {kept_rows:,} so far")
 
     stop_times = pd.concat(filtered_chunks, ignore_index=True)
     stops = stops[["stop_id", "stop_name", "stop_lat", "stop_lon"]].copy()
@@ -88,7 +88,7 @@ def load_static_gtfs_route(cfg: dict) -> pd.DataFrame:
     route_suffix = "_".join(route_type_list)
     output_file = output_dir / f"static_gtfs_{route_suffix}.csv"
     merged_df.to_csv(output_file, index=False, encoding="utf-8-sig")
-    print(f"✅ Saved merged static GTFS to {output_file}")
+    print(f"Saved merged static GTFS to {output_file}")
     return merged_df
 
 

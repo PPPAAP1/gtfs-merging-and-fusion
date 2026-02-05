@@ -19,13 +19,13 @@ def main_menu():
     cfg = load_config()
 
     while True:
-        print("\n===============================")
-        print("Welcome to GTFS Merging and Fusion Working Pannel ")
         print("===============================")
-        print("It is suggested to do the followings if you already have full dataset:")
+        print("Welcome to GTFS Merging and Fusion Working Pannel")
+        print("===============================")
+        print("It is suggested to do the followings if you already have full dataset(Static + Realtime):")
         print("1. Load and filter Static GTFS by Route Type")
         print("or")
-        print("2. Analyse delay by Stop Name")
+        print("2. Analyse delay by the Stop Name")
         print("===============================")
         print("If you don't have GTFS Real-time data:")
         print("3. Fetch Real-time GTFS-RT data now")
@@ -49,7 +49,7 @@ def main_menu():
 
             print(df.head())
         elif choice == "0":
-            print("Seeya")
+            print("Auf Wiedersehen!")
             break
         else:
             print("Invalid choice, please enter a number 0-2")
