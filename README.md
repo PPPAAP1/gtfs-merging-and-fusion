@@ -40,18 +40,24 @@ pip install -r requirements.txt
 ## Project Structure
 
 ```
-├── config/        # Configuration files, paths, and certificates
-├── data/          # Raw GTFS-Static and GTFS-Realtime data
-├── output/        # Generated figures and merging/fusion results
-├── src/           # Source code for filtering, sorting, and merging
-│   └── XXX.py  # The function of your script(Must also be added in the top of your code!)
+├── config/                     # Configuration files (paths, parameters)
+├── data/                       # Raw GTFS-Static and GTFS-Realtime data
+├── output/                     # Generated CSVs and plots
+├── src/                        # Source code
+│   ├── gtfs_merging_fusion/                # GTFS static processing
+│   │   └── fusion_finale.py                
+│   └── gtfs_scraping_main/                 # GTFS realtime processing
+│       └── fetch_realtime_gtfs.py          
+│       └── read_route_type_gtfs.py         
+│       └── read_stop_name_gtfs.py          
+
 ```
 
 ## Configuration
 All of the configurations are paired with a `config.yaml`file under the folder `config`. See `ConfigREADME.MD` for more.
 
 ## License
-Specify your project license.
+Apache-2.0 license
 
 ## References
 - [GTFS Specification Reference](https://developers.google.com/transit/gtfs/reference/extended-route-types)

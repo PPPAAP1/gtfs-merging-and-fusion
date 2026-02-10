@@ -3,9 +3,12 @@ from pathlib import Path
 import yaml
 
 # Import existing script functions
-from src.gtfs_merging_and_fusion.read_route_type_gtfs import load_static_gtfs_route
-from src.gtfs_merging_and_fusion.fetch_realtime_gtfs import fetch_gtfs_rt_once, plot_delay_trend
-from src.gtfs_merging_and_fusion.read_stop_name_gtfs import load_static_gtfs_stop
+from src.gtfs_scraping_main.read_route_type_gtfs import load_static_gtfs_route
+from src.gtfs_scraping_main.fetch_realtime_gtfs import start_fetch_loop
+from src.gtfs_scraping_main.read_stop_name_gtfs import load_static_gtfs_stop
+
+from src.gtfs_merging_fusion.fusion_finale import merging_fusion
+
 def load_config():
     cfg_path = Path("config/config.yaml")
     if not cfg_path.exists():
@@ -19,17 +22,24 @@ def main_menu():
     cfg = load_config()
 
     while True:
-        print("===============================")
-        print("Welcome to GTFS Merging and Fusion Working Pannel")
-        print("===============================")
-        print("It is suggested to do the followings if you already have full dataset(Static + Realtime):")
+        print("======================================")
+        print("++++++++++++++++++++++++++++++++++++++")
+        print("Welcome to GTFS Working Pannel")
+        print("++++++++++++++++++++++++++++++++++++++")
+        print("======================================")
+        print("If you already have full dataset(Static + Realtime trip-updates):")
         print("1. Load and filter Static GTFS by Route Type")
-        print("or")
-        print("2. Analyse delay by the Stop Name")
-        print("===============================")
-        print("If you don't have GTFS Real-time data:")
-        print("3. Fetch Real-time GTFS-RT data now")
-        print("===============================")
+        print("and/or")
+        print("2. Load, filter and analyse GTFS data by Stop Name")
+        print("--------------------------------------")
+        print("If you don't have GTFS static data:")
+        print("go to OpenDataÖPNV or GovData.de or gtfs.de, See README.md for details")
+        print("--------------------------------------")
+        print("If you don't have GTFS Real-time Trip Updates:")
+        print("3. Fetch Real-time GTFS-RT now.")
+        print("--------------------------------------")
+        print("If you have set your desired static and real-time trip updates in a certain location:")
+        print("4. Run Fusion and Final Analysis")
         print("0. Exit")
 
         choice = input("Please enter your choice number: ").strip()
@@ -44,15 +54,19 @@ def main_menu():
             print(df.head())
 
         elif choice == "3":
-            print("\n🕒 Preparing for Fetching Real-time GTFS-RT")
-            fetch_gtfs_rt_once()
-
+            print("\n📂 Preparing for Fetching Real-time GTFS-RT")
+            start_fetch_loop()
             print(df.head())
+
+        elif choice == "4":
+            print("\n📂 Running the test Merging and Fusion Analysis")
+            merging_fusion()
+
         elif choice == "0":
             print("Auf Wiedersehen!")
             break
         else:
-            print("Invalid choice, please enter a number 0-2")
+            print("Invalid choice, please enter a number 0-4")
 
 if __name__ == "__main__":
     main_menu()

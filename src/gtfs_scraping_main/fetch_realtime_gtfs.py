@@ -13,6 +13,17 @@ from cryptography.hazmat.backends import default_backend
 from google.transit import gtfs_realtime_pb2
 import matplotlib.pyplot as plt
 
+"""
+fetch_realtime_gtfs.py
+
+The script fetches GTFS-RT trip updates using a .p12 certificate you get from your administrator,
+and parses them into JSON and CSV formats.
+It also maintains a timeline of delay records and generates a trend plot upon manual stop.
+
+This will be useful if you don't have GTFS-RT Trip Update Data.
+Please follow the instructions in README.md to set up your .p12 file and config.yaml correctly.
+"""
+
 
 # -------------------------
 # Load Configuration
@@ -49,7 +60,7 @@ timeline_log = []
 # --------------------------------------
 def fetch_gtfs_rt_once():
     print("=" * 60)
-    print(f"🚀 Fetching GTFS-RT feed at {datetime.now().isoformat(timespec='seconds')}")
+    print(f"Fetching GTFS-RT feed at {datetime.now().isoformat(timespec='seconds')}")
 
     # Certificate and key extraction(GPT)
     with open(P12_FILE, "rb") as f:
@@ -130,7 +141,7 @@ def fetch_gtfs_rt_once():
         # Save CSV
         csv_file_path = OUTPUT_DIR / f"DELFI_GTFS_TripUpdates_{timestamp}.csv"
         df = pd.DataFrame(records)
-        df.to_csv(csv_file_path, index=False, encoding="utf-8-sig")  # 避免 Excel 乱码
+        df.to_csv(csv_file_path, index=False, encoding="utf-8-sig")  # Avoid Excel garbled text
 
 
         total_delays = arrival_delays + departure_delays
@@ -185,21 +196,24 @@ def plot_delay_trend():
 # --------------------------------------
 # Main Program
 # --------------------------------------
-if __name__ == "__main__":
+def start_fetch_loop():
+    """Start the continuous GTFS-RT fetch loop"""
     print(f"🚆 GTFS-RT Fetch Task Started (Every {FETCH_INTERVAL_MINUTES} Minutes)")
     try:
         while True:
             fetch_gtfs_rt_once()
-
             remaining = FETCH_INTERVAL_SECONDS
             while remaining > 0:
                 print(f"⏳ Next fetch countdown: {remaining} seconds", end="\r", flush=True)
+                print(f"Press Ctrl+C to stop and generate trend plot...", end="\r", flush=True)
                 sleep_time = min(PRINT_INTERVAL, remaining)
                 time.sleep(sleep_time)
                 remaining -= sleep_time
             print()
-
     except KeyboardInterrupt:
         print("\n🛑 Manual stop, generating trend plot...")
         plot_delay_trend()
         print("✅ Done!")
+
+if __name__ == "__main__":
+    start_fetch_loop()

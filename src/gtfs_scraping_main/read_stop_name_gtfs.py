@@ -3,6 +3,16 @@ from pathlib import Path
 import yaml
 import matplotlib.pyplot as plt
 
+"""
+read_stop_name_gtfs.py
+
+The script loads static GTFS data from the directory,
+filters it by user-selected stop_name(s), and saves the filtered dataset to a new CSV file.
+
+This will be useful if you have full GTFS Static data,
+and you want to focus on specific destination stops (e.g., Dresden, or Dresden Hauptbahnhof, etc.) for your analysis.
+"""
+
 def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
     static_dir = Path(cfg["paths"]["raw_static"])
     output_dir = Path(cfg["processed_dir"])
@@ -22,7 +32,7 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
         return pd.DataFrame(), []
 
     stop_ids = matched_stops["stop_id"].unique().tolist()
-    print(f"🔹 Found {len(stop_ids)} stop_id(s) for '{stop_name}':")
+    print(f"Found {len(stop_ids)} stop_id(s) for '{stop_name}':")
     for sid, sname in zip(matched_stops["stop_id"], matched_stops["stop_name"]):
         print(f"   {sid} → {sname}")
 
@@ -39,7 +49,7 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
         chunk_filtered = chunk[chunk["stop_id"].isin(stop_ids)]
         kept_rows += len(chunk_filtered)
         filtered_chunks.append(chunk_filtered)
-        print(f"  ⏩ Read {total_rows:,} rows, kept {kept_rows:,} so far")
+        print(f"  📦 Read {total_rows:,} rows, kept {kept_rows:,} so far")
 
     if kept_rows == 0:
         print("⚠️ No matching stop_times rows.")
@@ -58,10 +68,9 @@ def load_static_gtfs_stop(cfg: dict, stop_name: str) -> pd.DataFrame:
 
     return merged_df, stop_ids
 
-
 def load_realtime_data(cfg: dict, stop_ids: list) -> pd.DataFrame:
     rt_dir = Path(cfg["paths"]["raw_rt"])
-    all_files = sorted(list(rt_dir.glob("*")))  # CSV 或 JSON 文件
+    all_files = sorted(list(rt_dir.glob("*")))  # output csv or json files
     total_files = len(all_files)
     all_records = []
 
@@ -82,7 +91,7 @@ def load_realtime_data(cfg: dict, stop_ids: list) -> pd.DataFrame:
         df_filtered["source_file"] = f.name
         all_records.append(df_filtered)
 
-        print(f"📄 Processed {f.name} ({i}/{total_files}), kept {len(df_filtered)} rows, {total_files - i} files to go")
+        print(f"Processed {f.name} ({i}/{total_files}), kept {len(df_filtered)} rows, {total_files - i} files to go")
 
     if not all_records:
         return pd.DataFrame()

@@ -1,7 +1,0 @@
-definitely: 
-pandas
-protobuf
-gtfs-realtime-bindings
-requests
-pyaml
-

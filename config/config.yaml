@@ -5,53 +5,78 @@
 
 project:
   name: "gtfs-merging-and-fusion"
-  version: "0.1.0"
+  version: "0.9.0"
 
 paths:
   raw_static: "data/raw/static/"
   raw_rt: "data/raw/rt/2025-12-04/"
-  # This path please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/...
-
-# 默认选取的 route_type，可为列表
-default_route_type:
-  - "106"
-
+  # NOTE 01: please arrange rt data to be in data/raw/rt/YYYY-MM-DD/...before running the analysis script 1 and 2.
 
 realtime:
-  p12_file: "H:/the_coding_environment/railway_operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/certificate.p12"
-  # FIXME Don't confuse with \ and / when you directly copy the path and paste it here. Use / always.
+  p12_file: "H:/the_coding_environment/railway_operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/testcertificate.p12"
+  #Use / always, when copy/pasting directly from your file explorer.
   p12_password: "T34hM61D@WAh"
   pull_url: "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
-  output_rt_dir: "data/raw/rt/FETCHED/"
+  output_rt_dir: "data/raw/rt/"
   FETCH_INTERVAL_MINUTES: 12
-
   # TERMINATE MANUALLY USING CTRL + C!!!!!!!!!!!!!
   # Pause using Ctrl + S
-  # please manually arrange rt data to be in data/raw/rt/YYYY-MM-DD/...
-
-
-  # 清洗后的输出
-  cleaned_rt: "data/processed/"
-
-#条件输出结果：
+  # File size of each fetch of all data is 1.5-3 MB, with 12 minutes interval, it will be around 1 GiB per day.
+# Processed data directory of your filtered data by stop name and route type
 processed_dir: "data/processed/"
 
-
-# 输出结果
+# Output of all results, including plots and tables
 output_dir: "output/"
 plot_trend: "output/plots/"
   # filtered_data: "data/processed/"
 
-#time:
-  # 使用自然日
-  #start: "2025-01-01 00:00:00"
-  #end: "2025-01-01 23:59:59"
 
-  # 聚合窗口
-  #aggregation_minutes: 10
 
+# Fusion configuration for a single station
+fusion:
+  # Input files for fusion_finale.py
+  static_gtfs_file: "output/static_gtfs_Dresden_Hauptbahnhof.csv"  # Static GTFS data for single station
+  realtime_gtfs_file: "output/delay_Dresden_Hauptbahnhof.csv"      # Realtime GTFS data for single station
+  
+  # Station configuration
+  station_name: "Dresden Hauptbahnhof"
+  
+  # Expected columns
+  static_columns:
+    - trip_id
+    - stop_id
+    - stop_name
+    - stop_lat
+    - stop_lon
+    - arrival_time
+    - departure_time
+    - service_id
+  
+  realtime_columns:
+    - trip_id
+    - stop_id
+    - arrival_delay
+    - departure_delay
+    - fetch_timestamp
+    - source_file
+    - route_type
+    - stop_name
+    - stop_lat
+    - stop_lon
+    - arrival_time
+    - departure_time
+    - service_id
+    - delay_min
+    - dep_delay_min
+
+
+
+
+
+
+
+######################Config for future analysis scripts######################
 filters:
-
   valid_route_types:
     - 101   # ICE
     - 102   # IC/EC
@@ -61,7 +86,6 @@ filters:
     - 700   # Bus
     - 704   # Tram
 
-  # 你分析的交通方式类别映射
   category_mapping:
     bus: [700]
     tram: [704]
@@ -69,9 +93,14 @@ filters:
     ice_ic: [101, 102]
 
 cleaning:
-  # 过滤异常延迟的数据
-  min_arrival_delay: -300     # 删除 -300 秒以下 —— 数据噪声
-  max_arrival_delay: 14400     # 删除 4 小时以上 —— 极值
+  # Cleaning abnormal data
+  min_arrival_delay: -300     # Arrive in advance more than 5 minutes
+  max_arrival_delay: 14400     # Delay more than 4 Hours
+
+# Your default analyse route type.
+default_route_type:
+  - "106" # RB/RE
+
 
 settings:
   log_level: "INFO"
