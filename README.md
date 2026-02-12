@@ -54,7 +54,7 @@ pip install -r requirements.txt
 ```
 
 ## Configuration
-All of the configurations are paired with a `config.yaml`file under the folder `config`. See `ConfigREADME.MD` for more.
+All of the configurations are paired with a `config.yaml`file under the folder `config`. See `ConfigREADME.md` for more.
 
 ## License
 Apache-2.0 license
