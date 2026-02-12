@@ -2,6 +2,7 @@
 log/
 
 *csv
+*xlsx
 *json
 *pb
 *zip
@@ -12,6 +13,7 @@ routes.txt
 stop_times.txt
 stops.txt
 trips.txt
+shapes.txt
 
 # no Python cache
 scripts/__pycache__/
@@ -34,4 +36,4 @@ scripts/__pycache__/
 
 # no Research Documents
 Research_Documents/
-data/raw/static/shapes.txt
+
