@@ -27,7 +27,7 @@ The initial research motivation is to **analyze the gap between planned schedule
 - Required dependencies listed in `requirements.txt`
 - A registered account on `mobilithek.info`
 - Access to a Mobilithek organization (contact your organization administrator)
-- For further steps, please see XXXX
+- For further steps, please see ISG_DataSubscription.pdf in the main folder
 
 ## Installation
 Clone the repository and install the dependencies:
@@ -45,11 +45,11 @@ pip install -r requirements.txt
 ├── output/                     # Generated CSVs and plots
 ├── src/                        # Source code
 │   ├── gtfs_merging_fusion/                # GTFS static processing
-│   │   └── fusion_finale.py                
+│   │   └── fusion_finale.py                # analyse script for demonstration
 │   └── gtfs_scraping_main/                 # GTFS realtime processing
-│       └── fetch_realtime_gtfs.py          
-│       └── read_route_type_gtfs.py         
-│       └── read_stop_name_gtfs.py          
+│       └── fetch_realtime_gtfs.py          # main GTFS-RT Fetching Script (Trip Update Only)
+│       └── read_route_type_gtfs.py         # filter data by route type
+│       └── read_stop_name_gtfs.py          # filter data by stop names
 
 ```
 
