@@ -35,7 +35,7 @@ def main_menu():
         print("If you don't have GTFS static data:")
         print("go to OpenDataÖPNV or GovData.de or gtfs.de, See README.md for details")
         print("--------------------------------------")
-        print("If you don't have GTFS Real-time Trip Updates:")
+        print("If you don't have GTFS Real-time Data:")
         print("3. Fetch Real-time GTFS-RT now.")
         print("--------------------------------------")
         print("If you have set your desired static and real-time trip updates in a certain location:")

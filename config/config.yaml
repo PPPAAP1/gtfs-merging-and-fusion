@@ -16,7 +16,12 @@ realtime:
   p12_file: "H:/the_coding_environment/railway_operation/gtfs-data-mandf/gtfs-merging-and-fusion/config/testcertificate.p12"
   #Use / always, when copy/pasting directly from your file explorer.
   p12_password: "T34hM61D@WAh"
+
   pull_url: "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=912322615062511616"
+  # THIS URL IS FOR TRIP UPDATE FETCHES ONLY. TO get Service alert， Please uncomment the following line and use the same fetching script.
+  # pull_url: "https://mobilithek.info:8443/mobilithek/api/v1.0/container/subscription?subscriptionID=897186685888724992"
+
+
   output_rt_dir: "data/raw/rt/"
   FETCH_INTERVAL_MINUTES: 12
   # TERMINATE MANUALLY USING CTRL + C!!!!!!!!!!!!!
