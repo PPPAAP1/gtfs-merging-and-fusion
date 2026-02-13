@@ -34,7 +34,6 @@ Clone the repository and install the dependencies:
 ```bash
 git clone https://github.com/PPPAAP1/strecken-info-export
 cd gtfs-merging-and-fusion
-pip install -r requirements.txt
 ```
 
 ## Project Structure
