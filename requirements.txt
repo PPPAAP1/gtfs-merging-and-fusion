@@ -1,0 +1,15 @@
+# GTFS Explorer dependencies
+pandas>=1.5
+numpy
+pyyaml
+matplotlib
+statsmodels
+requests
+cryptography
+gtfs-realtime-bindings
+
+# Streamlit UI
+# Python 3.9.7: stuck on streamlit 1.12 (all newer versions exclude 3.9.7)
+# Upgrade Python to 3.9.13 or 3.10+ to use streamlit>=1.28
+streamlit==1.12.0
+altair>=4.0,<5

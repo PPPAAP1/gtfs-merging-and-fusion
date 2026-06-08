@@ -1,0 +1,3 @@
+[server]
+# Allow uploads up to 2 GB — full national GTFS feeds (e.g. DELFI Germany) can exceed 500 MB
+maxUploadSize = 2000
