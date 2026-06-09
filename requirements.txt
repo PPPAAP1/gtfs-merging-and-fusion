@@ -13,3 +13,7 @@ gtfs-realtime-bindings
 # Upgrade Python to 3.9.13 or 3.10+ to use streamlit>=1.28
 streamlit==1.12.0
 altair>=4.0,<5
+
+# Map-based stop selection
+folium>=0.14
+streamlit-folium>=0.6

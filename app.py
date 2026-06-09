@@ -3,6 +3,7 @@ GTFS Explorer — Streamlit App
 Run with:  streamlit run app.py
 """
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -20,6 +21,30 @@ def _pick_folder() -> str:
         return path or ""
     except Exception:
         return ""
+
+def _stops_in_polygon(stops_df: pd.DataFrame, geojson_coords: list) -> pd.Series:
+    """
+    Vectorized ray-casting point-in-polygon test.
+    geojson_coords: GeoJSON polygon coordinates — a list of rings, each ring a list
+    of [lon, lat] pairs.  Only the exterior ring (index 0) is tested.
+    Returns a boolean Series aligned to stops_df.index.
+    """
+    ring = np.array(geojson_coords[0])   # shape (N, 2): col 0 = lon, col 1 = lat
+    px = stops_df["stop_lon"].values.astype(float)
+    py = stops_df["stop_lat"].values.astype(float)
+    inside = np.zeros(len(px), dtype=bool)
+    n = len(ring)
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i, 0], ring[i, 1]
+        xj, yj = ring[j, 0], ring[j, 1]
+        cond_y = (yi > py) != (yj > py)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            x_cross = (xj - xi) * (py - yi) / (yj - yi) + xi
+        inside ^= cond_y & (px < x_cross)
+        j = i
+    return pd.Series(inside, index=stops_df.index)
+
 
 from src.gtfs_filter import apply_filters
 from src.gtfs_loader import GTFSData, load_from_folder, load_from_zip
@@ -159,37 +184,195 @@ if gtfs and gtfs.is_loaded():
 
     # ── Stop name ─────────────────────────────────────────────────────────────
     use_stop = st.checkbox("Filter by stop name")
+    selected_stop_names = []
     if use_stop:
-        stop_query = st.text_input(
-            "Stop name",
-            placeholder="e.g.  Dresden Hauptbahnhof",
-            help="Partial match, case-insensitive",
+        stop_mode = st.radio(
+            "Selection method",
+            ["Text search", "Draw on map"],
+            horizontal=True,
         )
-        if stop_query.strip():
-            q = stop_query.strip().lower()
-            matched_stops = gtfs.stops[
-                gtfs.stops["stop_name"].str.lower().str.contains(q, na=False, regex=False)
-            ]
-            if matched_stops.empty:
-                st.warning(f"No stops found matching '{stop_query}'. Check your spelling.")
-            else:
-                unique_names = matched_stops["stop_name"].unique()
-                preview = ", ".join(unique_names[:8])
-                suffix = f", and {len(unique_names) - 8} more  ({len(unique_names)} total)" if len(unique_names) > 8 else f"  ({len(unique_names)} total)"
-                st.success(f"Matched: {preview}{suffix}")
-    else:
-        stop_query = None
 
-    # ── Service date ──────────────────────────────────────────────────────────
+        # ── Text search ───────────────────────────────────────────────────────
+        if stop_mode == "Text search":
+            stop_search = st.text_input(
+                "Search stop name",
+                placeholder="e.g.  Dresden  or  Frankfurt",
+                help="Type a keyword to search, then pick exact stops from the list below.",
+            )
+            if stop_search.strip():
+                q = stop_search.strip().lower()
+                matched_stops = gtfs.stops[
+                    gtfs.stops["stop_name"].str.lower().str.contains(q, na=False, regex=False)
+                ]
+                unique_names = sorted(matched_stops["stop_name"].unique().tolist())
+
+                if not unique_names:
+                    st.warning(f"No stops found matching '{stop_search}'. Check your spelling.")
+                else:
+                    default_selection = unique_names if len(unique_names) <= 10 else []
+                    if len(unique_names) > 10:
+                        st.caption(
+                            f"{len(unique_names)} stops found — please select which ones to include."
+                        )
+                    selected_stop_names = st.multiselect(
+                        f"Select stops  ({len(unique_names)} found)",
+                        options=unique_names,
+                        default=default_selection,
+                    )
+                    if not selected_stop_names:
+                        st.warning("No stops selected — this filter will be ignored.")
+
+        # ── Draw on map ───────────────────────────────────────────────────────
+        else:
+            try:
+                import folium
+                from folium.plugins import Draw, FastMarkerCluster
+                from streamlit_folium import st_folium
+            except ImportError:
+                st.error(
+                    "Map selection requires extra packages. "
+                    "Run:  pip install folium streamlit-folium"
+                )
+                st.stop()
+
+            stops_geo = gtfs.stops.copy()
+            for _col in ("stop_lat", "stop_lon"):
+                if _col in stops_geo.columns:
+                    stops_geo[_col] = pd.to_numeric(stops_geo[_col], errors="coerce")
+            stops_geo = stops_geo.dropna(subset=["stop_lat", "stop_lon"])
+
+            if stops_geo.empty:
+                st.warning("No stops with coordinate data found in this feed.")
+            else:
+                n_stops = len(stops_geo)
+
+                # Large feeds (e.g. 537k stops) produce HTML too large for the
+                # component iframe. Cap the *displayed* sample; the polygon check
+                # still runs against the full stops_geo DataFrame.
+                _MAP_DISPLAY_LIMIT = 20_000
+                if n_stops > _MAP_DISPLAY_LIMIT:
+                    display_stops = stops_geo.sample(_MAP_DISPLAY_LIMIT, random_state=42)
+                    _sample_note = (
+                        f"Map displays a random sample of {_MAP_DISPLAY_LIMIT:,} / {n_stops:,} stops. "
+                        "Your drawn shape will still match **all** stops inside it."
+                    )
+                else:
+                    display_stops = stops_geo
+                    _sample_note = None
+
+                # Build the Folium map once per loaded dataset and cache in session_state.
+                _map_cache_key = f"_stop_map_{n_stops}"
+                if _map_cache_key not in st.session_state:
+                    _prog      = st.progress(0.0)
+                    _prog_text = st.empty()
+
+                    _prog_text.text("Computing map centre...")
+                    _prog.progress(0.1)
+                    center_lat = float(stops_geo["stop_lat"].mean())
+                    center_lon = float(stops_geo["stop_lon"].mean())
+
+                    _prog_text.text("Initializing base map...")
+                    _prog.progress(0.3)
+                    # Wrap in folium.Figure so the iframe gets an explicit pixel height.
+                    # Without this, folium.Map generates a relative-height div that
+                    # collapses to a thin bar inside the Streamlit component iframe.
+                    _fig = folium.Figure(width=700, height=500)
+                    _m = folium.Map(location=[center_lat, center_lon], zoom_start=6)
+                    _fig.add_child(_m)
+
+                    _prog_text.text(
+                        f"Adding {len(display_stops):,} stop markers (clustered)..."
+                    )
+                    _prog.progress(0.6)
+                    locations = display_stops[["stop_lat", "stop_lon"]].values.tolist()
+                    FastMarkerCluster(data=locations, name="Stops").add_to(_m)
+
+                    _prog_text.text("Adding draw controls...")
+                    _prog.progress(0.9)
+                    Draw(
+                        export=False,
+                        draw_options={
+                            "polyline": False,
+                            "circle": False,
+                            "circlemarker": False,
+                            "marker": False,
+                            "rectangle": True,
+                            "polygon": True,
+                        },
+                    ).add_to(_m)
+
+                    st.session_state[_map_cache_key] = _fig
+                    _prog.progress(1.0)
+                    _prog.empty()
+                    _prog_text.empty()
+
+                _fig_cached = st.session_state[_map_cache_key]
+
+                if _sample_note:
+                    st.info(_sample_note)
+                else:
+                    st.caption(
+                        f"Showing all {n_stops:,} stops (clustered). "
+                        "Zoom into your area of interest, then use the toolbar on the "
+                        "**left edge of the map** to draw a rectangle or polygon."
+                    )
+                map_out = st_folium(_fig_cached, width=700, height=500, key="stop_map_selector")
+
+                drawn_geom = None
+                if map_out and map_out.get("last_active_drawing"):
+                    drawn_geom = map_out["last_active_drawing"].get("geometry")
+
+                if drawn_geom and drawn_geom.get("type") == "Polygon":
+                    coords = drawn_geom["coordinates"]
+                    mask = _stops_in_polygon(stops_geo, coords)
+                    inside_df = stops_geo[mask]
+
+                    if inside_df.empty:
+                        st.warning("No stops inside the drawn shape — try a larger area.")
+                    else:
+                        matched_names = sorted(
+                            inside_df["stop_name"].dropna().unique().tolist()
+                        )
+                        st.success(
+                            f"{len(inside_df):,} stop entries / "
+                            f"{len(matched_names):,} unique names found inside your selection."
+                        )
+                        default_sel = matched_names if len(matched_names) <= 50 else []
+                        if len(matched_names) > 50:
+                            st.caption(
+                                f"{len(matched_names)} unique stop names — "
+                                "deselect any you don't need before applying filters."
+                            )
+                        selected_stop_names = st.multiselect(
+                            f"Stops in selection  ({len(matched_names)} names)",
+                            options=matched_names,
+                            default=default_sel,
+                        )
+                        if not selected_stop_names:
+                            st.warning("No stops selected — this filter will be ignored.")
+
+    # ── Service date range ────────────────────────────────────────────────────
     use_date = st.checkbox(
-        "Filter by service date",
+        "Filter by service date range",
         disabled=not overview["has_calendar"],
         help="Requires calendar.txt or calendar_dates.txt in the feed." if not overview["has_calendar"] else "",
     )
     if use_date and overview["has_calendar"]:
-        target_date = st.date_input("Service date")
+        date_start = st.date_input("From date")
+        date_end   = st.date_input("To date", value=date_start)
+        if date_end < date_start:
+            st.error("'To date' must be on or after 'From date'.")
+            use_date = False   # block Apply until fixed
+        else:
+            delta_days = (date_end - date_start).days + 1
+            if delta_days == 1:
+                st.caption("Single day selected.")
+            elif delta_days > 90:
+                st.warning(f"Large range: {delta_days} days — filtering may take a moment.")
+            else:
+                st.caption(f"Range: {delta_days} days.")
     else:
-        target_date = None
+        date_start = date_end = None
         if use_date and not overview["has_calendar"]:
             st.warning("No calendar data found in this feed — date filter is unavailable.")
 
@@ -243,8 +426,9 @@ if gtfs and gtfs.is_loaded():
                     gtfs_data=gtfs,
                     zip_bytes=st.session_state.get("zip_bytes"),
                     route_types=selected_types or None,
-                    stop_name_query=(stop_query or "").strip() or None,
-                    target_date=target_date,
+                    stop_names=selected_stop_names or None,
+                    date_start=date_start,
+                    date_end=date_end,
                     dep_time_start=(dep_start or "").strip() or None,
                     dep_time_end=(dep_end   or "").strip() or None,
                     arr_time_start=(arr_start or "").strip() or None,
@@ -312,6 +496,39 @@ if gtfs and gtfs.is_loaded():
                 if c in result.columns and (c in required_present or c in selected_optional)
             ]
             export_df = result[export_cols]
+
+            # ── Field name mapping ────────────────────────────────────────────
+            rename_map: dict = {}
+            with st.expander("Field name mapping  (optional)"):
+                st.caption(
+                    "Rename GTFS columns to match your own database or system schema. "
+                    "Edit the field below each column — leave unchanged to keep the original name."
+                )
+                for _col in export_cols:
+                    new_name = st.text_input(
+                        _col,
+                        value=_col,
+                        key=f"rename_{_col}",
+                    )
+                    stripped = (new_name or "").strip()
+                    if stripped and stripped != _col:
+                        rename_map[_col] = stripped
+
+                if rename_map:
+                    effective_names = [rename_map.get(c, c) for c in export_cols]
+                    if len(effective_names) != len(set(effective_names)):
+                        st.error(
+                            "Duplicate output names detected — each column must have a unique name."
+                        )
+                        rename_map = {}   # suppress rename until conflict is resolved
+                    else:
+                        st.success(
+                            f"Renaming: "
+                            + ",  ".join(f"{k} → {v}" for k, v in rename_map.items())
+                        )
+
+            if rename_map:
+                export_df = export_df.rename(columns=rename_map)
 
             # ── Preview ───────────────────────────────────────────────────────
             st.subheader("Preview (first 1 000 rows)")

@@ -74,6 +74,73 @@ class GTFSData:
             "route_type_stats": stats,
         }
 
+    def get_active_service_ids_in_range(self, start_date, end_date) -> Optional[set]:
+        """
+        Return service_ids active on at least one day within [start_date, end_date].
+        Both args accept datetime.date or 'YYYYMMDD' strings.
+        Returns None if no calendar data was loaded.
+
+        Uses a single vectorised pass over calendar.txt regardless of range length,
+        plus one pass over calendar_dates.txt for exception additions.
+        """
+        if not self.has_calendar:
+            return None
+
+        from datetime import timedelta
+
+        def _to_date_and_str(d):
+            if isinstance(d, date_cls):
+                return d, d.strftime("%Y%m%d")
+            s = str(d)
+            return pd.Timestamp(s).date(), s
+
+        start_date, start_str = _to_date_and_str(start_date)
+        end_date,   end_str   = _to_date_and_str(end_date)
+
+        active: set = set()
+
+        # ── Regular schedule (calendar.txt) ───────────────────────────────────
+        if self.calendar is not None and not self.calendar.empty:
+            # Services whose validity period overlaps the requested range
+            overlap = self.calendar[
+                (self.calendar["start_date"].astype(str) <= end_str)
+                & (self.calendar["end_date"].astype(str) >= start_str)
+            ]
+            if not overlap.empty:
+                # Which day-of-week names actually appear in the requested range?
+                all_weekdays = [
+                    "monday", "tuesday", "wednesday", "thursday",
+                    "friday", "saturday", "sunday",
+                ]
+                days_in_range: set = set()
+                cur = start_date
+                while cur <= end_date:
+                    days_in_range.add(cur.strftime("%A").lower())
+                    cur += timedelta(days=1)
+
+                active_day_cols = [
+                    d for d in all_weekdays
+                    if d in days_in_range and d in overlap.columns
+                ]
+                if active_day_cols:
+                    runs_on_range_day = overlap[active_day_cols].isin(["1"]).any(axis=1)
+                    active.update(overlap.loc[runs_on_range_day, "service_id"])
+
+        # ── Exception additions (calendar_dates.txt) ──────────────────────────
+        if self.calendar_dates is not None and not self.calendar_dates.empty:
+            in_range = self.calendar_dates[
+                (self.calendar_dates["date"].astype(str) >= start_str)
+                & (self.calendar_dates["date"].astype(str) <= end_str)
+            ]
+            added = in_range.loc[
+                in_range["exception_type"].astype(str) == "1", "service_id"
+            ]
+            active.update(added)
+            # Note: we deliberately do NOT subtract exception_type=2 removals here.
+            # A service removed on one day may still run on other days in the range.
+
+        return active
+
     def get_active_service_ids(self, date) -> Optional[set]:
         """
         Return service_ids active on the given date.

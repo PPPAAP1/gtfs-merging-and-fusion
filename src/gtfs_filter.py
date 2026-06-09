@@ -33,8 +33,9 @@ def apply_filters(
     gtfs_data: GTFSData,
     zip_bytes: Optional[bytes] = None,
     route_types: Optional[List[str]] = None,
-    stop_name_query: Optional[str] = None,
-    target_date: Optional[date_cls] = None,
+    stop_names: Optional[List[str]] = None,
+    date_start: Optional[date_cls] = None,
+    date_end: Optional[date_cls] = None,
     dep_time_start: Optional[str] = None,
     dep_time_end: Optional[str] = None,
     arr_time_start: Optional[str] = None,
@@ -66,9 +67,11 @@ def apply_filters(
     if not valid_trip_ids:
         return pd.DataFrame()
 
-    # ── 2. Narrow trips by date ───────────────────────────────────────────────
-    if target_date is not None:
-        active_sids = gtfs_data.get_active_service_ids(target_date)
+    # ── 2. Narrow trips by date range ────────────────────────────────────────
+    if date_start is not None or date_end is not None:
+        effective_start = date_start or date_end
+        effective_end   = date_end   or date_start
+        active_sids = gtfs_data.get_active_service_ids_in_range(effective_start, effective_end)
         if active_sids is not None:
             valid_trip_ids &= set(
                 trips.loc[trips["service_id"].isin(active_sids), "trip_id"]
@@ -76,11 +79,10 @@ def apply_filters(
             if not valid_trip_ids:
                 return pd.DataFrame()
 
-    # ── 3. Narrow stops by name ───────────────────────────────────────────────
+    # ── 3. Narrow stops by explicitly selected names ──────────────────────────
     valid_stop_ids: Optional[set] = None
-    if stop_name_query and stop_name_query.strip():
-        q = stop_name_query.strip().lower()
-        matched = stops[stops["stop_name"].str.lower().str.contains(q, na=False, regex=False)]
+    if stop_names:
+        matched = stops[stops["stop_name"].isin(stop_names)]
         if matched.empty:
             return pd.DataFrame()
         valid_stop_ids = set(matched["stop_id"])
