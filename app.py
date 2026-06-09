@@ -60,9 +60,16 @@ st.set_page_config(
 st.title("🚆 GTFS Explorer")
 st.caption("Extract the data you need from a static GTFS feed")
 
-# Force horizontal scroll on dataframes (Streamlit 1.12 doesn't enable it by default)
 st.markdown(
-    "<style>.stDataFrame > div { overflow-x: auto !important; }</style>",
+    """<style>
+    /* Horizontal scroll on dataframes (Streamlit 1.12 default is hidden) */
+    .stDataFrame > div { overflow-x: auto !important; }
+
+    /* streamlit-folium 0.11.0: Leaflet fires Streamlit.setFrameHeight(0) after
+       tile load, collapsing the iframe. Lock the minimum height via CSS so the
+       !important rule wins over the JS-driven height reset. */
+    iframe { min-height: 500px !important; }
+    </style>""",
     unsafe_allow_html=True,
 )
 
@@ -243,88 +250,90 @@ if gtfs and gtfs.is_loaded():
 
             if stops_geo.empty:
                 st.warning("No stops with coordinate data found in this feed.")
+                selected_stop_names = []
             else:
                 n_stops = len(stops_geo)
 
-                # Large feeds (e.g. 537k stops) produce HTML too large for the
-                # component iframe. Cap the *displayed* sample; the polygon check
-                # still runs against the full stops_geo DataFrame.
                 _MAP_DISPLAY_LIMIT = 20_000
-                if n_stops > _MAP_DISPLAY_LIMIT:
-                    display_stops = stops_geo.sample(_MAP_DISPLAY_LIMIT, random_state=42)
-                    _sample_note = (
-                        f"Map displays a random sample of {_MAP_DISPLAY_LIMIT:,} / {n_stops:,} stops. "
-                        "Your drawn shape will still match **all** stops inside it."
-                    )
-                else:
-                    display_stops = stops_geo
-                    _sample_note = None
+                display_stops = (
+                    stops_geo.sample(_MAP_DISPLAY_LIMIT, random_state=42)
+                    if n_stops > _MAP_DISPLAY_LIMIT
+                    else stops_geo
+                )
 
-                # Build the Folium map once per loaded dataset and cache in session_state.
-                _map_cache_key = f"_stop_map_{n_stops}"
-                if _map_cache_key not in st.session_state:
+                # The folium Map object is consumed (Jinja2 state exhausted) after
+                # st_folium renders it, so it must be rebuilt fresh on every rerun.
+                # Only show the progress bar the first time; subsequent rebuilds are
+                # silent and fast enough not to warrant a progress indicator.
+                _first_build = "_stop_map_ready" not in st.session_state
+                if _first_build:
                     _prog      = st.progress(0.0)
                     _prog_text = st.empty()
-
                     _prog_text.text("Computing map centre...")
                     _prog.progress(0.1)
-                    center_lat = float(stops_geo["stop_lat"].mean())
-                    center_lon = float(stops_geo["stop_lon"].mean())
 
+                center_lat = float(stops_geo["stop_lat"].mean())
+                center_lon = float(stops_geo["stop_lon"].mean())
+
+                if _first_build:
                     _prog_text.text("Initializing base map...")
                     _prog.progress(0.3)
-                    # Wrap in folium.Figure so the iframe gets an explicit pixel height.
-                    # Without this, folium.Map generates a relative-height div that
-                    # collapses to a thin bar inside the Streamlit component iframe.
-                    _fig = folium.Figure(width=700, height=500)
-                    _m = folium.Map(location=[center_lat, center_lon], zoom_start=6)
-                    _fig.add_child(_m)
 
+                _m = folium.Map(location=[center_lat, center_lon], zoom_start=6)
+
+                if _first_build:
                     _prog_text.text(
                         f"Adding {len(display_stops):,} stop markers (clustered)..."
                     )
                     _prog.progress(0.6)
-                    locations = display_stops[["stop_lat", "stop_lon"]].values.tolist()
-                    FastMarkerCluster(data=locations, name="Stops").add_to(_m)
 
+                locations = display_stops[["stop_lat", "stop_lon"]].values.tolist()
+                FastMarkerCluster(data=locations, name="Stops").add_to(_m)
+
+                if _first_build:
                     _prog_text.text("Adding draw controls...")
                     _prog.progress(0.9)
-                    Draw(
-                        export=False,
-                        draw_options={
-                            "polyline": False,
-                            "circle": False,
-                            "circlemarker": False,
-                            "marker": False,
-                            "rectangle": True,
-                            "polygon": True,
-                        },
-                    ).add_to(_m)
 
-                    st.session_state[_map_cache_key] = _fig
+                Draw(
+                    export=False,
+                    draw_options={
+                        "polyline": False,
+                        "circle": False,
+                        "circlemarker": False,
+                        "marker": False,
+                        "rectangle": True,
+                        "polygon": True,
+                    },
+                ).add_to(_m)
+
+                if _first_build:
+                    st.session_state["_stop_map_ready"] = True
                     _prog.progress(1.0)
                     _prog.empty()
                     _prog_text.empty()
 
-                _fig_cached = st.session_state[_map_cache_key]
-
-                if _sample_note:
-                    st.info(_sample_note)
+                if n_stops > _MAP_DISPLAY_LIMIT:
+                    st.info(
+                        f"Map displays a random sample of {_MAP_DISPLAY_LIMIT:,} / {n_stops:,} stops. "
+                        "Your drawn shape will still match **all** stops inside it."
+                    )
                 else:
                     st.caption(
                         f"Showing all {n_stops:,} stops (clustered). "
-                        "Zoom into your area of interest, then use the toolbar on the "
-                        "**left edge of the map** to draw a rectangle or polygon."
+                        "Zoom in, then use the toolbar on the **left edge** to draw a "
+                        "rectangle or polygon."
                     )
-                map_out = st_folium(_fig_cached, width=700, height=500, key="stop_map_selector")
+
+                map_out = st_folium(_m, width=700, height=500, key="stop_map_selector")
 
                 drawn_geom = None
                 if map_out and map_out.get("last_active_drawing"):
                     drawn_geom = map_out["last_active_drawing"].get("geometry")
 
+                selected_stop_names = []
                 if drawn_geom and drawn_geom.get("type") == "Polygon":
                     coords = drawn_geom["coordinates"]
-                    mask = _stops_in_polygon(stops_geo, coords)
+                    mask   = _stops_in_polygon(stops_geo, coords)
                     inside_df = stops_geo[mask]
 
                     if inside_df.empty:
@@ -335,18 +344,16 @@ if gtfs and gtfs.is_loaded():
                         )
                         st.success(
                             f"{len(inside_df):,} stop entries / "
-                            f"{len(matched_names):,} unique names found inside your selection."
+                            f"{len(matched_names):,} unique names inside your selection."
                         )
-                        default_sel = matched_names if len(matched_names) <= 50 else []
-                        if len(matched_names) > 50:
-                            st.caption(
-                                f"{len(matched_names)} unique stop names — "
-                                "deselect any you don't need before applying filters."
-                            )
+                        st.caption(
+                            f"{len(matched_names)} stop names pre-selected — "
+                            "deselect any you don't need."
+                        )
                         selected_stop_names = st.multiselect(
                             f"Stops in selection  ({len(matched_names)} names)",
                             options=matched_names,
-                            default=default_sel,
+                            default=matched_names,
                         )
                         if not selected_stop_names:
                             st.warning("No stops selected — this filter will be ignored.")
