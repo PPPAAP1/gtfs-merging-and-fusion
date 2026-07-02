@@ -34,6 +34,19 @@ Clone the repository and install the dependencies:
 ```bash
 git clone https://github.com/PPPAAP1/strecken-info-export
 cd gtfs-merging-and-fusion
+pip install -r requirements.txt
+```
+
+## Quick Start
+
+**Double-click `run_app.bat`** in the project folder to launch the interactive Streamlit app.  
+A browser window will open automatically. Close the terminal window to stop the app.
+
+> If `python` is not on your system PATH, open the file and adjust the command to point to your Python installation.
+
+Alternatively, run manually from a terminal:
+```bash
+python -m streamlit run GTFS_Static_Explorer.py
 ```
 
 ## Project Structure
