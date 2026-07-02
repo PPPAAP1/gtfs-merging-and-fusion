@@ -1,4 +1,5 @@
 @echo off
 cd /d "%~dp0"
-"D:\Python\Scripts\streamlit.exe" run GTFS_Static_Explorer.py
+set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+python -m streamlit run GTFS_Static_Explorer.py
 pause
