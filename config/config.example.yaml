@@ -1,0 +1,69 @@
+# Safe example configuration. Copy this file to config.yaml and fill in local
+# credentials there. Never commit config.yaml or a .p12 certificate.
+
+project:
+  name: "gtfs-merging-and-fusion"
+  version: "0.9.0"
+
+paths:
+  raw_static: "data/raw/static/"
+  raw_rt: "data/raw/rt/YYYY-MM-DD/"
+
+realtime:
+  p12_file: "C:/path/to/your/mobilithek-certificate.p12"
+  p12_password: ""
+  pull_url: ""
+  output_rt_dir: "data/raw/rt/"
+  FETCH_INTERVAL_MINUTES: 12
+
+processed_dir: "data/processed/"
+output_dir: "output/"
+plot_trend: "output/plots/"
+
+fusion:
+  static_gtfs_file: "output/static_gtfs_Dresden_Hauptbahnhof.csv"
+  realtime_gtfs_file: "output/delay_Dresden_Hauptbahnhof.csv"
+  station_name: "Dresden Hauptbahnhof"
+  static_columns:
+    - trip_id
+    - stop_id
+    - stop_name
+    - stop_lat
+    - stop_lon
+    - arrival_time
+    - departure_time
+    - service_id
+  realtime_columns:
+    - trip_id
+    - stop_id
+    - arrival_delay
+    - departure_delay
+    - fetch_timestamp
+    - source_file
+    - route_type
+    - stop_name
+    - stop_lat
+    - stop_lon
+    - arrival_time
+    - departure_time
+    - service_id
+    - delay_min
+    - dep_delay_min
+
+filters:
+  valid_route_types: [101, 102, 103, 106, 109, 700, 704]
+  category_mapping:
+    bus: [700]
+    tram: [704]
+    s_bahn: [109]
+    ice_ic: [101, 102]
+
+cleaning:
+  min_arrival_delay: -300
+  max_arrival_delay: 14400
+
+default_route_type:
+  - "106"
+
+settings:
+  log_level: "INFO"

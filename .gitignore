@@ -17,10 +17,14 @@ shapes.txt
 
 # no Python cache
 scripts/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.cache
+.venv/
+.dashboard-venv/
+venv/
 
 # no temp. file
 *.tmp
@@ -36,4 +40,8 @@ scripts/__pycache__/
 
 # no Research Documents
 Research_Documents/
+
+# local credentials and connection settings
+config/config.yaml
+*.p12
 

@@ -1,5 +1,9 @@
 ## Configuration Overview
 
+Copy `config.example.yaml` to `config.yaml` before configuring realtime
+access. `config.yaml` and all `.p12` files are ignored by Git so credentials
+remain local.
+
 This `config.yaml` file sets up the GTFS and GTFS-RT data pipeline for railway operation analysis.
 
 ### Core Sections
@@ -27,5 +31,6 @@ This `config.yaml` file sets up the GTFS and GTFS-RT data pipeline for railway o
 ### Usage Notes
 
 - Use forward slashes (/) in all file paths
+- Keep the `.p12` certificate and its password out of Git
 - Stop the real-time fetcher manually with Ctrl+C
 - Organize real-time data in `data/raw/rt/YYYY-MM-DD/` directories
