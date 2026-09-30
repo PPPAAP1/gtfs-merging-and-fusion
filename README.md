@@ -1,139 +1,87 @@
 # GTFS Explorer Dashboard
 
-A local Streamlit dashboard for exploring, filtering, collecting, and combining
-German public-transport data in GTFS Static and GTFS Realtime formats.
+A local Streamlit application for working with German GTFS Static and GTFS
+Realtime data. It supports timetable filtering, realtime collection, delay
+inspection, and CSV export from one browser interface.
 
-## Overview
+## Start on Windows
 
-This project provides three connected workflows in one browser-based app:
+Double-click `Start Dashboard.bat`.
 
-1. **GTFS Static Explorer**: Load a GTFS ZIP file or folder, filter routes,
-   stops, trips, and service data, preview the result, and export it as CSV.
-2. **GTFS-RT Explorer**: Open previously collected realtime data, restrict the
-   time and geographic scope, inspect delays, and export filtered records.
-3. **GTFS-RT Live Fetch**: Retrieve current TripUpdates from Mobilithek using a
-   client certificate, optionally filter them with a static reference, and run
-   repeated collection at a configurable interval.
+On its first run, the launcher creates a local `.dashboard-venv` environment
+and installs the required packages. Later starts open the Dashboard directly.
+Keep the launcher window open while using the app; closing it stops the server.
 
-The project is intended as a practical starting point for researchers and
-students studying the difference between planned schedules and observed public-
-transport operations.
+To start manually instead:
 
-## Features
+```bash
+python -m pip install -r requirements.txt
+python -m streamlit run GTFS_Static_Explorer.py
+```
 
-- Load GTFS Static feeds from ZIP files or extracted folders.
-- Filter by transport mode, route, stop, location, and service attributes.
-- Select stops geographically on an interactive map.
-- Browse large collections of previously fetched GTFS-RT records.
-- Fetch nationwide German GTFS-RT TripUpdates from Mobilithek.
-- Merge static schedules with realtime delay observations.
-- Preview results and export analysis-ready CSV files.
+## Dashboard pages
+
+### GTFS Static Explorer
+
+Load a GTFS ZIP file or extracted folder, then filter by transport type, stop,
+map selection, service date, or arrival/departure time. Results can be previewed,
+renamed, and exported as CSV.
+
+### GTFS-RT Explorer
+
+Open previously collected realtime records, narrow them by date and time, inspect
+delay trends, and export filtered results.
+
+### GTFS-RT Live Fetch
+
+Fetch current Mobilithek TripUpdates once or continuously. A static GTFS result
+can optionally be used to restrict the collected trips and stops.
+
+## Realtime configuration
+
+The launcher creates `config/config.yaml` from the safe example when the file is
+missing. Before using live fetching, set these local values under `realtime`:
+
+- `p12_file`: path to the Mobilithek client certificate;
+- `p12_password`: certificate password;
+- `pull_url`: TripUpdates subscription endpoint;
+- `FETCH_INTERVAL_MINUTES`: continuous-fetch interval;
+- `output_rt_dir`: directory for collected realtime files.
+
+See `config/configREADME.md` and `ISG_DataSubscription.pdf` for additional setup
+information. Use forward slashes in YAML paths on Windows.
+
+`config/config.yaml` and all `.p12` files are ignored by Git. Keep the certificate
+and its password local; the repository contains only `config/config.example.yaml`.
 
 ## Project layout
 
 ```text
 gtfs-merging-and-fusion/
-├── GTFS_Static_Explorer.py       # Streamlit entry point
-├── Start Dashboard.bat           # Windows double-click launcher
-├── pages/
-│   ├── 1_GTFS-RT_Explorer.py     # Browse collected realtime data
-│   └── 2_GTFS-RT_Live_Fetch.py   # Fetch live TripUpdates
-├── src/                           # Loading, filtering, fetching, and fusion
-├── config/
-│   ├── config.yaml                # Paths and realtime connection settings
-│   ├── config.example.yaml        # Safe configuration template
-│   └── configREADME.md            # Configuration reference
-├── data/                          # Local input and collected data
+├── GTFS_Static_Explorer.py       # Main Streamlit page
+├── Start Dashboard.bat           # Windows launcher
+├── pages/                         # Realtime Explorer and Live Fetch pages
+├── src/                           # Loading, filtering, fetching, and fusion code
+├── config/                        # Safe template and local configuration
+├── data/                          # Local GTFS input and collected data
 └── output/                        # Generated exports and figures
 ```
 
 ## Requirements
 
-- Windows with Python 3.9 or newer.
-- A modern web browser.
-- GTFS Static data for the static explorer.
-- For live GTFS-RT collection: a Mobilithek account, organization access, and
-  the `.p12` client certificate issued for that subscription.
-
-See `ISG_DataSubscription.pdf` for the Mobilithek subscription procedure.
-
-## Installation
-
-No command-line installation is required on Windows. The launcher creates an
-isolated environment and installs the packages from `requirements.txt` on its
-first run.
-
-For a manual installation:
-
-```bash
-git clone https://github.com/PPPAAP1/gtfs-merging-and-fusion.git
-cd gtfs-merging-and-fusion
-python -m pip install -r requirements.txt
-```
-
-## Usage
-
-### Windows: start by double-clicking
-
-Double-click `Start Dashboard.bat` in the project folder. On the first start,
-the launcher creates a local `.dashboard-venv` environment and installs the
-required packages. Later starts open the dashboard directly.
-
-Keep the launcher window open while using the dashboard. Closing it stops the
-dashboard. The older `run_app.bat` filename remains available and opens the same
-launcher.
-
-### Command line
-
-```bash
-python -m streamlit run GTFS_Static_Explorer.py
-```
-
-Streamlit opens the dashboard in the default browser. Use the sidebar to move
-between the Static Explorer, GTFS-RT Explorer, and GTFS-RT Live Fetch pages.
-
-## Configuration
-
-Realtime acquisition is configured in `config/config.yaml`. Before fetching,
-set the following values under `realtime`:
-
-- `p12_file`: path to the Mobilithek client certificate.
-- `p12_password`: password for that certificate.
-- `pull_url`: TripUpdates subscription endpoint.
-- `FETCH_INTERVAL_MINUTES`: interval for continuous collection.
-- `output_rt_dir`: directory used for saved realtime data.
-
-Paths, filters, fusion inputs, and output columns are documented in
-`config/configREADME.md`. Use forward slashes in YAML paths on Windows.
-
-Do not commit real certificate files or passwords to a public repository.
-Both `config/config.yaml` and `*.p12` are intentionally ignored by Git. The
-launcher creates `config/config.yaml` from `config/config.example.yaml` when it
-is missing.
-
-### Certificate safety
-
-Treat the `.p12` file and its password like an account password:
-
-- Keep the certificate only on machines that perform the realtime fetch.
-- Store it outside the repository when practical and reference its local path.
-- Never commit the certificate, password, or private subscription URL.
-- If any of these values have previously been committed, revoke or replace the
-  credential; deleting it in a later commit does not remove it from Git history.
+- Windows with Python 3.9 or newer;
+- a modern web browser;
+- GTFS Static data for timetable exploration;
+- Mobilithek organization access and a `.p12` certificate for live collection.
 
 ## Data notes
 
-- GTFS ZIP uploads are limited by Streamlit's upload configuration; use the
-  local-folder option for very large feeds.
-- Realtime feeds can generate large datasets. At a 12-minute interval, storage
-  use can approach approximately 1 GiB per day.
-- Continuous fetching runs only while the Dashboard and launcher window remain
-  open.
+- For very large GTFS feeds, use the local-folder option instead of browser upload.
+- Realtime collection can approach roughly 1 GiB per day at a 12-minute interval.
+- Continuous fetching stops when the Dashboard process is closed.
 
 ## License
 
-Licensed under the Apache License 2.0. See `LICENSE` for details.
+Apache License 2.0. See `LICENSE` for details.
 
-## Reference
-
-- [GTFS documentation](https://gtfs.org/documentation/overview/)
+GTFS format documentation: [gtfs.org](https://gtfs.org/documentation/overview/).
